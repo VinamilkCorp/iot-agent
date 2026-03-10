@@ -1,0 +1,35 @@
+{
+  "name": "iot-scale",
+  "version": "1.0.0",
+  "description": "IoT Scale Desktop App",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac",
+    "build:linux": "electron-builder --linux"
+  },
+  "build": {
+    "appId": "com.yourcompany.iot-scale",
+    "productName": "IoT Scale",
+    "publish": {
+      "provider": "github",
+      "owner": "YOUR_USERNAME",
+      "repo": "YOUR_REPO"
+    },
+    "win": { "target": "nsis" },
+    "mac": { "target": "dmg" },
+    "linux": { "target": "AppImage" },
+    "files": ["main.js", "preload.js", "renderer/**/*", "src/**/*"]
+  },
+  "dependencies": {
+    "@serialport/parser-readline": "^12.0.0",
+    "electron-updater": "^6.1.7",
+    "serialport": "^12.0.0"
+  },
+  "devDependencies": {
+    "electron": "^29.0.0",
+    "electron-builder": "^24.9.1"
+  }
+}
