@@ -26,9 +26,11 @@ async function findScalePorts() {
   });
 }
 
+const SERIAL_DEFAULTS = { dataBits: 8, stopBits: 1, parity: "none" };
+
 function probePort(path, baudRate, timeout = 3000) {
   return new Promise((resolve, reject) => {
-    const port = new SerialPort({ path, baudRate, autoOpen: false });
+    const port = new SerialPort({ path, baudRate, ...SERIAL_DEFAULTS, autoOpen: false });
     const parser = port.pipe(new ReadlineParser({ delimiter: "\r\n" }));
     const timer = setTimeout(() => {
       port.close();
@@ -96,6 +98,7 @@ class ScaleReader extends EventEmitter {
     this._port = new SerialPort({
       path: this.path,
       baudRate: this.baudRate,
+      ...SERIAL_DEFAULTS,
       autoOpen: false,
     });
     const parser = this._port.pipe(new ReadlineParser({ delimiter: "\r\n" }));
