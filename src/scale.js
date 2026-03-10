@@ -62,7 +62,10 @@ function probePort(path, baudRate, timeout = 3000) {
     port.open((err) => {
       if (err) {
         clearTimeout(timer);
-        log("error", `probePort: failed to open ${path} @ ${baudRate} — ${err.message} (code:${err.cause?.errno ?? err.errno ?? "?"}${err.cause?.code ? " " + err.cause.code : err.code ? " " + err.code : ""})`);
+        const isCommStateErr = /SetCommState|code 31|error code 31/i.test(err.message);
+        const level = isCommStateErr ? "warn" : "error";
+        const hint  = isCommStateErr ? " — driver rejected baud rate, skipping" : "";
+        log(level, `probePort: failed to open ${path} @ ${baudRate} — ${err.message}${hint}`);
         reject(err);
       } else {
         log("info", `probePort: opened ${path} @ ${baudRate}, waiting for data…`);
@@ -131,8 +134,11 @@ class ScaleReader extends EventEmitter {
 
     this._port.open((err) => {
       if (err) {
-        const detail = `${err.message} (code:${err.cause?.errno ?? err.errno ?? "?"}${err.cause?.code ? " " + err.cause.code : err.code ? " " + err.code : ""})`;
-        log("error", `ScaleReader.connect: failed to open ${this.path} — ${detail}`);
+        const isCommStateErr = /SetCommState|code 31|error code 31/i.test(err.message);
+        const detail = isCommStateErr
+          ? `${err.message} — Windows driver rejected baud rate ${this.baudRate}, try a different rate`
+          : `${err.message} (code:${err.cause?.errno ?? err.errno ?? "?"}${err.cause?.code ? " " + err.cause.code : err.code ? " " + err.code : ""})`;
+        log(isCommStateErr ? "warn" : "error", `ScaleReader.connect: failed to open ${this.path} — ${detail}`);
         this.emit("error", Object.assign(err, { detail }));
         return this._scheduleReconnect();
       }
