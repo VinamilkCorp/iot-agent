@@ -139,6 +139,13 @@ function showTab(name) {
   if (name === 'monitor') drawChart();
 }
 
+// ── IPC log events from scale.js ─────────────────────────────────────────────
+window.scale.onLog(({ level, msg, ts }) => {
+  const time = new Date(ts).toLocaleTimeString();
+  const cls = level === 'error' ? 'error' : level === 'warn' ? 'warn' : 'info';
+  log(`[scale] ${msg}`, cls, time);
+});
+
 // ── IPC events from main process ──────────────────────────────────────────────
 window.scale.onEvent((data) => {
   if (data.event === 'connected') {
@@ -171,10 +178,10 @@ function setScaleStatus(dot, text, meta = '') {
 
 // ── Log ───────────────────────────────────────────────────────────────────────
 const logEl = document.getElementById('log-body');
-function log(msg, cls = 'info') {
+function log(msg, cls = 'info', time = new Date().toLocaleTimeString()) {
   const line = document.createElement('div');
   line.className = `log-line ${cls}`;
-  line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
+  line.textContent = `[${time}] ${msg}`;
   logEl.appendChild(line);
   logEl.scrollTop = logEl.scrollHeight;
   while (logEl.children.length > 500) logEl.removeChild(logEl.firstChild);

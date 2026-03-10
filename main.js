@@ -1,7 +1,7 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
-const { autoConnect, listPorts, findScalePorts } = require('./src/scale');
+const { autoConnect, listPorts, findScalePorts, logger } = require('./src/scale');
 
 let win;
 
@@ -21,6 +21,8 @@ function createWindow() {
 app.whenReady().then(() => {
   createWindow();
   autoUpdater.checkForUpdatesAndNotify();
+
+  logger.on('log', (entry) => win?.webContents.send('log', entry));
 
   autoConnect().then((reader) => {
     reader.on('connected', (info) => win?.webContents.send('scale', { event: 'connected', ...info }));
