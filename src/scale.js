@@ -115,10 +115,12 @@ async function detectScale(timeout = 3000) {
 }
 
 class ScaleReader extends EventEmitter {
-  constructor({ path, baudRate = 9600 } = {}) {
+  constructor({ path, baudRate = 9600, weightDelta = 0.001 } = {}) {
     super();
     this.path = path;
     this.baudRate = baudRate;
+    this._weightDelta = weightDelta;
+    this._lastWeight = null;
     this._port = null;
     this._reconnectTimer = null;
   }
@@ -159,6 +161,8 @@ class ScaleReader extends EventEmitter {
       const trimmed = line.trim();
       const data = this._detectModel(trimmed);
       if (data) {
+        if (this._lastWeight !== null && Math.abs(data.weight - this._lastWeight) < this._weightDelta) return;
+        this._lastWeight = data.weight;
         log("info", `ScaleReader: weight=${data.weight} ${data.unit} model=${data.model} raw="${trimmed}"`);
         this.emit("weight", data);
       } else {
@@ -243,6 +247,7 @@ async function autoConnect(options = {}) {
       const reader = new ScaleReader({
         path: detected.path,
         baudRate: detected.baudRate,
+        ...(options.weightDelta !== undefined && { weightDelta: options.weightDelta }),
       });
       reader.connect();
       resolve(reader);
