@@ -5,4 +5,9 @@ contextBridge.exposeInMainWorld('scale', {
   onLog:          (cb) => ipcRenderer.on('log',   (_e, entry) => cb(entry)),
   listPorts:      ()   => ipcRenderer.invoke('list-ports'),
   listScalePorts: ()   => ipcRenderer.invoke('list-scale-ports'),
+  getEnv:              ()   => ipcRenderer.invoke('get-env'),
+  onAuthCallback: (cb) => ipcRenderer.on('auth-callback', (_e, url) => cb(url)),
+  reloadWithCallback: (fragment) => ipcRenderer.invoke('reload-with-callback', fragment),
+  getPendingAuthUrl:   ()   => ipcRenderer.invoke('get-pending-auth-url'),
+  openLoginUrl:        (url) => ipcRenderer.invoke('open-login-url', url),
 });
