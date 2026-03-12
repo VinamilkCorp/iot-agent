@@ -8,15 +8,16 @@
     "build": "electron-builder",
     "build:win": "electron-builder --win",
     "build:mac": "electron-builder --mac",
-    "build:linux": "electron-builder --linux"
+    "build:linux": "electron-builder --linux",
+    "publish": "electron-builder --publish always"
   },
   "build": {
     "appId": "com.yourcompany.iot-scale",
     "productName": "IoT Scale",
     "publish": {
       "provider": "github",
-      "owner": "YOUR_USERNAME",
-      "repo": "YOUR_REPO"
+      "owner": "VinamilkCorp",
+      "repo": "iot-agent"
     },
     "win": {
       "target": "nsis",
