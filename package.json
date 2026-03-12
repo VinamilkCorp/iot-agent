@@ -9,7 +9,10 @@
     "build:win": "electron-builder --win",
     "build:mac": "electron-builder --mac",
     "build:linux": "electron-builder --linux",
-    "publish": "electron-builder --publish always"
+    "publish": "electron-builder --publish always",
+    "publish:win": "electron-builder --win --publish always",
+    "publish:mac": "electron-builder --mac --publish always",
+    "publish:all": "electron-builder --win --mac --publish always"
   },
   "build": {
     "appId": "com.yourcompany.iot-scale",
