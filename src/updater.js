@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const { execFile, spawn } = require("child_process");
 
-const GITHUB_REPO = "VinamilkCorp/iot-agent"; // e.g. 'acme/iot-scale'
+const GITHUB_REPO = "VinamilkCorp/iot-agent";
 const CURRENT_VERSION = require("../package.json").version;
 
 const ASSET_NAME = {

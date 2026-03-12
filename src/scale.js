@@ -33,7 +33,21 @@ async function findScalePorts() {
   return candidates;
 }
 
-const SERIAL_DEFAULTS = { dataBits: 8, stopBits: 1, parity: "none" };
+const SERIAL_DEFAULTS = { dataBits: 8, stopBits: 1, parity: "none", hupcl: false };
+
+function openWithRetry(port, retries = 3, delayMs = 500) {
+  return new Promise((resolve, reject) => {
+    const attempt = (n) => {
+      port.open((err) => {
+        if (!err) return resolve();
+        if (n <= 1 || !/SetCommState|code 31/i.test(err.message)) return reject(err);
+        log("warn", `openWithRetry: SetCommState failed, retrying in ${delayMs}ms\u2026 (${n - 1} left)`);
+        setTimeout(() => attempt(n - 1), delayMs);
+      });
+    };
+    attempt(retries);
+  });
+}
 
 function probePort(path, baudRate, timeout = 3000) {
   log("info", `probePort: trying ${path} @ ${baudRate} baud (dataBits:${SERIAL_DEFAULTS.dataBits} stopBits:${SERIAL_DEFAULTS.stopBits} parity:${SERIAL_DEFAULTS.parity})`);
@@ -59,17 +73,13 @@ function probePort(path, baudRate, timeout = 3000) {
       }
     });
 
-    port.open((err) => {
-      if (err) {
-        clearTimeout(timer);
-        const isCommStateErr = /SetCommState|code 31|error code 31/i.test(err.message);
-        const level = isCommStateErr ? "warn" : "error";
-        const hint  = isCommStateErr ? " — driver rejected baud rate, skipping" : "";
-        log(level, `probePort: failed to open ${path} @ ${baudRate} — ${err.message}${hint}`);
-        reject(err);
-      } else {
-        log("info", `probePort: opened ${path} @ ${baudRate}, waiting for data…`);
-      }
+    openWithRetry(port).then(() => {
+      log("info", `probePort: opened ${path} @ ${baudRate}, waiting for data…`);
+    }).catch((err) => {
+      clearTimeout(timer);
+      const isCommStateErr = /SetCommState|code 31/i.test(err.message);
+      log(isCommStateErr ? "warn" : "error", `probePort: failed to open ${path} @ ${baudRate} — ${err.message}`);
+      reject(err);
     });
   });
 }
@@ -105,10 +115,12 @@ async function detectScale(timeout = 3000) {
 }
 
 class ScaleReader extends EventEmitter {
-  constructor({ path, baudRate = 9600 } = {}) {
+  constructor({ path, baudRate = 9600, weightDelta = 0.001 } = {}) {
     super();
     this.path = path;
     this.baudRate = baudRate;
+    this._weightDelta = weightDelta;
+    this._lastWeight = null;
     this._port = null;
     this._reconnectTimer = null;
   }
@@ -132,24 +144,25 @@ class ScaleReader extends EventEmitter {
     });
     const parser = this._port.pipe(new ReadlineParser({ delimiter: "\r\n" }));
 
-    this._port.open((err) => {
-      if (err) {
-        const isCommStateErr = /SetCommState|code 31|error code 31/i.test(err.message);
-        const detail = isCommStateErr
-          ? `${err.message} — Windows driver rejected baud rate ${this.baudRate}, try a different rate`
-          : `${err.message} (code:${err.cause?.errno ?? err.errno ?? "?"}${err.cause?.code ? " " + err.cause.code : err.code ? " " + err.code : ""})`;
-        log(isCommStateErr ? "warn" : "error", `ScaleReader.connect: failed to open ${this.path} — ${detail}`);
-        this.emit("error", Object.assign(err, { detail }));
-        return this._scheduleReconnect();
-      }
+    openWithRetry(this._port).then(() => {
       log("info", `ScaleReader.connect: port open — ${this.path} @ ${this.baudRate} baud`);
       this.emit("connected", { path: this.path, baudRate: this.baudRate });
+    }).catch((err) => {
+      const isCommStateErr = /SetCommState|code 31/i.test(err.message);
+      const detail = isCommStateErr
+        ? `${err.message} — Windows driver rejected settings for ${this.path}, will retry`
+        : `${err.message} (code:${err.cause?.errno ?? err.errno ?? "?"})` ;
+      log(isCommStateErr ? "warn" : "error", `ScaleReader.connect: failed to open ${this.path} — ${detail}`);
+      this.emit("error", Object.assign(err, { detail }));
+      this._scheduleReconnect();
     });
 
     parser.on("data", (line) => {
       const trimmed = line.trim();
       const data = this._detectModel(trimmed);
       if (data) {
+        if (this._lastWeight !== null && Math.abs(data.weight - this._lastWeight) < this._weightDelta) return;
+        this._lastWeight = data.weight;
         log("info", `ScaleReader: weight=${data.weight} ${data.unit} model=${data.model} raw="${trimmed}"`);
         this.emit("weight", data);
       } else {
@@ -234,6 +247,7 @@ async function autoConnect(options = {}) {
       const reader = new ScaleReader({
         path: detected.path,
         baudRate: detected.baudRate,
+        ...(options.weightDelta !== undefined && { weightDelta: options.weightDelta }),
       });
       reader.connect();
       resolve(reader);
