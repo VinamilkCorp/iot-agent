@@ -1,5 +1,3 @@
-const REDIRECT_URI = "iotscale://auth";
-
 const loginScreen = document.getElementById("login-screen");
 const loginStatus = document.getElementById("login-status");
 const loginError = document.getElementById("login-error");
@@ -26,9 +24,9 @@ function showError(err) {
 function waitForCallback() {
   log.info("registering auth-callback listener");
   return new Promise((resolve) => {
-    window.scale.onAuthCallback((url) => {
-      log.info(`auth-callback received — url=${url}`);
-      resolve(url);
+    window.scale.onAuthCallback((params) => {
+      log.info(`auth-callback received — params=${params}`);
+      resolve(params);
     });
   });
 }
@@ -41,6 +39,7 @@ function onLoginSuccess() {
 async function initAuth() {
   log.info("initAuth started");
   const env = await window.scale.getEnv();
+  const REDIRECT_URI = env.REDIRECT_URI;
 
   // Case 1: returning from external browser with stored callback params
   const storedCallback = sessionStorage.getItem("kcCallback");
@@ -92,12 +91,10 @@ async function initAuth() {
     await window.scale.openLoginUrl(loginUrl);
     loginStatus.textContent = "Waiting for login in browser…";
 
-    const callbackUrl = await waitForCallback();
-    log.info(`callback received — url=${callbackUrl}`);
-    const cbUrl = new URL(callbackUrl);
-    const cbParams = cbUrl.hash.substring(1) || cbUrl.search.substring(1);
-    log.info(`storing callback params and reloading: ${cbParams}`);
-    await window.scale.reloadWithCallback(cbParams);
+    const callbackParams = await waitForCallback();
+    log.info(`callback received — params=${callbackParams}`);
+    log.info(`storing callback params and reloading: ${callbackParams}`);
+    await window.scale.reloadWithCallback(callbackParams);
   } catch (err) {
     showError(err);
   }
