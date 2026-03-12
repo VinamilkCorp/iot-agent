@@ -18,14 +18,30 @@
       "owner": "YOUR_USERNAME",
       "repo": "YOUR_REPO"
     },
-    "win": { "target": "nsis" },
-    "mac": { "target": "dmg" },
-    "linux": { "target": "AppImage" },
-    "files": ["main.js", "preload.js", "renderer/**/*", "src/**/*"]
+    "win": {
+      "target": "nsis",
+      "protocols": [{ "name": "IoT Scale Auth", "schemes": ["iotscale"] }]
+    },
+    "mac": {
+      "target": "dmg",
+      "protocols": [{ "name": "IoT Scale Auth", "schemes": ["iotscale"] }]
+    },
+    "linux": {
+      "target": "AppImage"
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "renderer/**/*",
+      "src/**/*",
+      "node_modules/keycloak-js/**/*"
+    ]
   },
   "dependencies": {
     "@serialport/parser-readline": "^12.0.0",
     "electron-updater": "^6.1.7",
+    "keycloak-js": "^26.2.3",
+    "dotenv": "^16.0.0",
     "serialport": "^12.0.0"
   },
   "devDependencies": {

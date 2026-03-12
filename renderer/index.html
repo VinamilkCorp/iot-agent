@@ -1,135 +1,407 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
-<head>
-<meta charset="UTF-8" />
-<title>IoT Scale</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: monospace; background: #0d0d0d; color: #ccc; display: flex; flex-direction: column; height: 100vh; }
+  <head>
+    <meta charset="UTF-8" />
+    <title>IoT Scale</title>
+    <style>
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        font-family: monospace;
+        background: #0d0d0d;
+        color: #ccc;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
 
-  header { padding: 10px 20px; background: #161616; border-bottom: 1px solid #222; display: flex; align-items: center; }
-  header h1 { font-size: 1rem; color: #fff; flex: 1; }
+      header {
+        padding: 10px 20px;
+        background: #161616;
+        border-bottom: 1px solid #222;
+        display: flex;
+        align-items: center;
+      }
+      header h1 {
+        font-size: 1rem;
+        color: #fff;
+        flex: 1;
+      }
 
-  #scale-bar { padding: 8px 20px; background: #111; border-bottom: 1px solid #1e1e1e; display: flex; align-items: center; gap: 24px; font-size: 0.8rem; }
-  .scale-val  { font-size: 1.6rem; font-weight: 700; color: #fff; }
-  .scale-unit { font-size: 0.9rem; color: #888; margin-left: 4px; }
-  #scale-meta { color: #555; }
+      #scale-bar {
+        padding: 8px 20px;
+        background: #111;
+        border-bottom: 1px solid #1e1e1e;
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        font-size: 0.8rem;
+      }
+      .scale-val {
+        font-size: 1.6rem;
+        font-weight: 700;
+        color: #fff;
+      }
+      .scale-unit {
+        font-size: 0.9rem;
+        color: #888;
+        margin-left: 4px;
+      }
+      #scale-meta {
+        color: #555;
+      }
 
-  nav { display: flex; background: #111; border-bottom: 1px solid #222; }
-  nav button { background: none; border: none; color: #666; padding: 8px 20px; font-size: 0.8rem; cursor: pointer; border-bottom: 2px solid transparent; font-family: monospace; }
-  nav button:hover { color: #ccc; }
-  nav button.active { color: #fff; border-bottom-color: #4caf50; }
+      nav {
+        display: flex;
+        background: #111;
+        border-bottom: 1px solid #222;
+      }
+      nav button {
+        background: none;
+        border: none;
+        color: #666;
+        padding: 8px 20px;
+        font-size: 0.8rem;
+        cursor: pointer;
+        border-bottom: 2px solid transparent;
+        font-family: monospace;
+      }
+      nav button:hover {
+        color: #ccc;
+      }
+      nav button.active {
+        color: #fff;
+        border-bottom-color: #4caf50;
+      }
 
-  .tab { display: none; flex: 1; overflow: hidden; flex-direction: column; }
-  .tab.active { display: flex; }
+      .tab {
+        display: none;
+        flex: 1;
+        overflow: hidden;
+        flex-direction: column;
+      }
+      .tab.active {
+        display: flex;
+      }
 
-  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #222; flex: 1; overflow: hidden; }
-  .panel { background: #0d0d0d; display: flex; flex-direction: column; overflow: hidden; }
-  .panel-title { padding: 6px 14px; font-size: 0.72rem; color: #555; background: #111; border-bottom: 1px solid #1e1e1e; display: flex; justify-content: space-between; align-items: center; }
-  .panel-title button { font-size: 0.7rem; background: #1e1e1e; border: 1px solid #333; color: #888; padding: 2px 8px; cursor: pointer; border-radius: 4px; }
-  .panel-title button:hover { color: #fff; }
-  .panel-body { flex: 1; overflow-y: auto; padding: 10px 14px; font-size: 0.78rem; line-height: 1.6; }
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1px;
+        background: #222;
+        flex: 1;
+        overflow: hidden;
+      }
+      .panel {
+        background: #0d0d0d;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .panel-title {
+        padding: 6px 14px;
+        font-size: 0.72rem;
+        color: #555;
+        background: #111;
+        border-bottom: 1px solid #1e1e1e;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+      .panel-title button {
+        font-size: 0.7rem;
+        background: #1e1e1e;
+        border: 1px solid #333;
+        color: #888;
+        padding: 2px 8px;
+        cursor: pointer;
+        border-radius: 4px;
+      }
+      .panel-title button:hover {
+        color: #fff;
+      }
+      .panel-body {
+        flex: 1;
+        overflow-y: auto;
+        padding: 10px 14px;
+        font-size: 0.78rem;
+        line-height: 1.6;
+      }
 
-  .log-line { white-space: pre-wrap; word-break: break-all; }
-  .log-line.info   { color: #ccc; }
-  .log-line.warn   { color: #f0a500; }
-  .log-line.error  { color: #e53935; }
-  .log-line.weight { color: #4caf50; }
+      .log-line {
+        white-space: pre-wrap;
+        word-break: break-all;
+      }
+      .log-line.info {
+        color: #ccc;
+      }
+      .log-line.warn {
+        color: #f0a500;
+      }
+      .log-line.error {
+        color: #e53935;
+      }
+      .log-line.weight {
+        color: #4caf50;
+      }
 
-  table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
-  th { text-align: left; color: #555; padding: 4px 8px; border-bottom: 1px solid #1e1e1e; }
-  td { padding: 4px 8px; border-bottom: 1px solid #111; }
-  td.scale-port { color: #4caf50; }
-  .empty { color: #444; font-style: italic; }
+      table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 0.75rem;
+      }
+      th {
+        text-align: left;
+        color: #555;
+        padding: 4px 8px;
+        border-bottom: 1px solid #1e1e1e;
+      }
+      td {
+        padding: 4px 8px;
+        border-bottom: 1px solid #111;
+      }
+      td.scale-port {
+        color: #4caf50;
+      }
+      .empty {
+        color: #444;
+        font-style: italic;
+      }
 
-  .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-right: 6px; }
-  .dot.green  { background: #4caf50; }
-  .dot.yellow { background: #f0a500; }
-  .dot.red    { background: #e53935; }
-  .dot.grey   { background: #555; }
+      .dot {
+        display: inline-block;
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        margin-right: 6px;
+      }
+      .dot.green {
+        background: #4caf50;
+      }
+      .dot.yellow {
+        background: #f0a500;
+      }
+      .dot.red {
+        background: #e53935;
+      }
+      .dot.grey {
+        background: #555;
+      }
 
-  #tab-monitor { padding: 16px; gap: 12px; }
-  #monitor-toolbar { display: flex; align-items: center; gap: 12px; font-size: 0.8rem; flex-wrap: wrap; }
-  #monitor-toolbar label { color: #555; }
-  #monitor-toolbar select, #monitor-toolbar input { background: #1e1e1e; border: 1px solid #333; color: #ccc; padding: 3px 8px; font-family: monospace; font-size: 0.78rem; border-radius: 4px; }
-  #monitor-toolbar button { background: #1e1e1e; border: 1px solid #333; color: #888; padding: 3px 10px; cursor: pointer; border-radius: 4px; font-family: monospace; font-size: 0.78rem; }
-  #monitor-toolbar button:hover { color: #fff; }
-  #chart-wrap { flex: 1; position: relative; min-height: 0; }
-  canvas#chart { width: 100%; height: 100%; display: block; }
-  #monitor-stats { display: flex; gap: 24px; font-size: 0.78rem; color: #555; flex-wrap: wrap; }
-  #monitor-stats span b { color: #ccc; }
-  #no-scale-msg { color: #444; font-style: italic; font-size: 0.85rem; text-align: center; margin-top: 40px; }
-</style>
-</head>
-<body>
+      #tab-monitor {
+        padding: 16px;
+        gap: 12px;
+      }
+      #monitor-toolbar {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        font-size: 0.8rem;
+        flex-wrap: wrap;
+      }
+      #monitor-toolbar label {
+        color: #555;
+      }
+      #monitor-toolbar select,
+      #monitor-toolbar input {
+        background: #1e1e1e;
+        border: 1px solid #333;
+        color: #ccc;
+        padding: 3px 8px;
+        font-family: monospace;
+        font-size: 0.78rem;
+        border-radius: 4px;
+      }
+      #monitor-toolbar button {
+        background: #1e1e1e;
+        border: 1px solid #333;
+        color: #888;
+        padding: 3px 10px;
+        cursor: pointer;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 0.78rem;
+      }
+      #monitor-toolbar button:hover {
+        color: #fff;
+      }
+      #chart-wrap {
+        flex: 1;
+        position: relative;
+        min-height: 0;
+      }
+      canvas#chart {
+        width: 100%;
+        height: 100%;
+        display: block;
+      }
+      #monitor-stats {
+        display: flex;
+        gap: 24px;
+        font-size: 0.78rem;
+        color: #555;
+        flex-wrap: wrap;
+      }
+      #monitor-stats span b {
+        color: #ccc;
+      }
+      #no-scale-msg {
+        color: #444;
+        font-style: italic;
+        font-size: 0.85rem;
+        text-align: center;
+        margin-top: 40px;
+      }
 
-<header>
-  <h1>⚖ IoT Scale Dashboard</h1>
-</header>
-
-<div id="scale-bar">
-  <div>
-    <span class="dot yellow" id="scale-dot"></span>
-    <span id="scale-status-text">Waiting for scale…</span>
-  </div>
-  <div>
-    <span class="scale-val" id="weight-val">—</span>
-    <span class="scale-unit" id="weight-unit"></span>
-  </div>
-  <div id="scale-meta"></div>
-</div>
-
-<nav>
-  <button class="active" onclick="showTab('overview')">Overview</button>
-  <button onclick="showTab('monitor')">Weight Monitor</button>
-  <button onclick="showTab('log')">Log</button>
-</nav>
-
-<div class="tab active" id="tab-overview">
-  <div class="grid">
-    <div class="panel">
-      <div class="panel-title"><span>ALL PORTS</span><button onclick="loadPorts()">↻ Refresh</button></div>
-      <div class="panel-body" id="ports-body"><span class="empty">Loading…</span></div>
+      /* ── Login screen ── */
+      #login-screen {
+        position: fixed;
+        inset: 0;
+        background: #0d0d0d;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        z-index: 999;
+        gap: 16px;
+      }
+      #login-screen h2 {
+        color: #fff;
+        font-size: 1.1rem;
+      }
+      #login-screen p {
+        color: #555;
+        font-size: 0.8rem;
+      }
+      #login-screen .dot-spin {
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: #4caf50;
+        animation: pulse 1s infinite;
+      }
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0.2;
+        }
+      }
+      #login-error {
+        color: #e53935;
+        font-size: 0.8rem;
+        display: none;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="login-screen">
+      <h2>⚖ IoT Scale</h2>
+      <div class="dot-spin"></div>
+      <p id="login-status">Connecting to authentication server…</p>
+      <p id="login-error"></p>
     </div>
-    <div class="panel">
-      <div class="panel-title"><span>SCALE PORTS</span><button onclick="loadScalePorts()">↻ Refresh</button></div>
-      <div class="panel-body" id="scale-ports-body"><span class="empty">Loading…</span></div>
+
+    <header>
+      <h1>⚖ IoT Scale Dashboard</h1>
+    </header>
+
+    <div id="scale-bar">
+      <div>
+        <span class="dot yellow" id="scale-dot"></span>
+        <span id="scale-status-text">Waiting for scale…</span>
+      </div>
+      <div>
+        <span class="scale-val" id="weight-val">—</span>
+        <span class="scale-unit" id="weight-unit"></span>
+      </div>
+      <div id="scale-meta"></div>
     </div>
-  </div>
-</div>
 
-<div class="tab" id="tab-monitor">
-  <div id="monitor-toolbar">
-    <label>Window <select id="window-select">
-      <option value="60">60 s</option>
-      <option value="120">2 min</option>
-      <option value="300" selected>5 min</option>
-      <option value="600">10 min</option>
-    </select></label>
-    <label>Threshold <input id="threshold-input" type="number" step="0.001" placeholder="e.g. 0.5" style="width:90px" /></label>
-    <button onclick="clearHistory()">Clear</button>
-    <button onclick="exportCsv()">Export CSV</button>
-  </div>
-  <div id="chart-wrap">
-    <canvas id="chart"></canvas>
-    <div id="no-scale-msg">No scale connected — waiting for data…</div>
-  </div>
-  <div id="monitor-stats">
-    <span>Points: <b id="stat-count">0</b></span>
-    <span>Min: <b id="stat-min">—</b></span>
-    <span>Max: <b id="stat-max">—</b></span>
-    <span>Avg: <b id="stat-avg">—</b></span>
-    <span>Last: <b id="stat-last">—</b></span>
-  </div>
-</div>
+    <nav>
+      <button class="active" onclick="showTab('overview')">Overview</button>
+      <button onclick="showTab('monitor')">Weight Monitor</button>
+      <button onclick="showTab('log')">Log</button>
+    </nav>
 
-<div class="tab" id="tab-log">
-  <div class="panel" style="flex:1">
-    <div class="panel-title"><span>LOG</span><span style="display:flex;gap:6px"><button id="btn-pause-log" onclick="toggleLog()">⏸ Pause</button><button onclick="clearLog()">Clear</button></span></div>
-    <div class="panel-body" id="log-body"></div>
-  </div>
-</div>
+    <div class="tab active" id="tab-overview">
+      <div class="grid">
+        <div class="panel">
+          <div class="panel-title">
+            <span>ALL PORTS</span
+            ><button onclick="loadPorts()">↻ Refresh</button>
+          </div>
+          <div class="panel-body" id="ports-body">
+            <span class="empty">Loading…</span>
+          </div>
+        </div>
+        <div class="panel">
+          <div class="panel-title">
+            <span>SCALE PORTS</span
+            ><button onclick="loadScalePorts()">↻ Refresh</button>
+          </div>
+          <div class="panel-body" id="scale-ports-body">
+            <span class="empty">Loading…</span>
+          </div>
+        </div>
+      </div>
+    </div>
 
-<script src="index.js"></script>
-</body>
+    <div class="tab" id="tab-monitor">
+      <div id="monitor-toolbar">
+        <label
+          >Window
+          <select id="window-select">
+            <option value="60">60 s</option>
+            <option value="120">2 min</option>
+            <option value="300" selected>5 min</option>
+            <option value="600">10 min</option>
+          </select></label
+        >
+        <label
+          >Threshold
+          <input
+            id="threshold-input"
+            type="number"
+            step="0.001"
+            placeholder="e.g. 0.5"
+            style="width: 90px"
+        /></label>
+        <button onclick="clearHistory()">Clear</button>
+        <button onclick="exportCsv()">Export CSV</button>
+      </div>
+      <div id="chart-wrap">
+        <canvas id="chart"></canvas>
+        <div id="no-scale-msg">No scale connected — waiting for data…</div>
+      </div>
+      <div id="monitor-stats">
+        <span>Points: <b id="stat-count">0</b></span>
+        <span>Min: <b id="stat-min">—</b></span>
+        <span>Max: <b id="stat-max">—</b></span>
+        <span>Avg: <b id="stat-avg">—</b></span>
+        <span>Last: <b id="stat-last">—</b></span>
+      </div>
+    </div>
+
+    <div class="tab" id="tab-log">
+      <div class="panel" style="flex: 1">
+        <div class="panel-title">
+          <span>LOG</span
+          ><span style="display: flex; gap: 6px"
+            ><button id="btn-pause-log" onclick="toggleLog()">⏸ Pause</button
+            ><button onclick="clearLog()">Clear</button></span
+          >
+        </div>
+        <div class="panel-body" id="log-body"></div>
+      </div>
+    </div>
+
+    <script type="module" src="auth.js"></script>
+    <script src="index.js"></script>
+  </body>
 </html>
