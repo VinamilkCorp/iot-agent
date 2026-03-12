@@ -6,8 +6,6 @@ const {
   Menu,
   dialog,
   nativeImage,
-  protocol,
-  shell,
 } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const path = require("path");
@@ -34,9 +32,15 @@ function startAuthServer() {
       const url = new URL(req.url, redirectUri.origin);
       if (url.pathname === redirectUri.pathname) {
         const params = url.search.substring(1);
-        if (authWin) { authWin.close(); authWin = null; }
+        if (authWin) {
+          authWin.close();
+          authWin = null;
+        }
         win?.webContents.send("auth-callback", params);
-        if (win) { win.show(); win.focus(); }
+        if (win) {
+          win.show();
+          win.focus();
+        }
         res.writeHead(200, { "Content-Type": "text/html" });
         res.end("<html><body><p>Login successful.</p></body></html>");
       } else {
@@ -149,20 +153,25 @@ app.whenReady().then(() => {
 
   logger.on("log", (entry) => win?.webContents.send("log", entry));
 
-  autoConnect().then((reader) => {
-    reader.on("connected", (info) =>
-      win?.webContents.send("scale", { event: "connected", ...info }),
-    );
-    reader.on("weight", (data) =>
-      win?.webContents.send("scale", { event: "weight", ...data }),
-    );
-    reader.on("disconnected", () =>
-      win?.webContents.send("scale", { event: "disconnected" }),
-    );
-    reader.on("error", (err) =>
-      win?.webContents.send("scale", { event: "error", message: err.message }),
-    );
-  }).catch((err) => console.error("[main] autoConnect error:", err));
+  autoConnect()
+    .then((reader) => {
+      reader.on("connected", (info) =>
+        win?.webContents.send("scale", { event: "connected", ...info }),
+      );
+      reader.on("weight", (data) =>
+        win?.webContents.send("scale", { event: "weight", ...data }),
+      );
+      reader.on("disconnected", () =>
+        win?.webContents.send("scale", { event: "disconnected" }),
+      );
+      reader.on("error", (err) =>
+        win?.webContents.send("scale", {
+          event: "error",
+          message: err.message,
+        }),
+      );
+    })
+    .catch((err) => console.error("[main] autoConnect error:", err));
 });
 
 ipcMain.handle("list-ports", () => listPorts());
@@ -176,7 +185,9 @@ ipcMain.handle("get-env", () => ({
 ipcMain.handle("open-login-url", (_e, url) => {
   authWin = new BrowserWindow({ width: 800, height: 700, title: "Login" });
   authWin.loadURL(url);
-  authWin.on("closed", () => { authWin = null; });
+  authWin.on("closed", () => {
+    authWin = null;
+  });
 });
 ipcMain.handle("reload-with-callback", async (_e, fragment) => {
   await win?.webContents.executeJavaScript(

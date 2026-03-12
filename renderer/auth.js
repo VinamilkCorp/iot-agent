@@ -41,7 +41,6 @@ async function initAuth() {
   const env = await window.scale.getEnv();
   const REDIRECT_URI = env.REDIRECT_URI;
 
-  // Case 1: returning from external browser with stored callback params
   const storedCallback = sessionStorage.getItem("kcCallback");
   if (storedCallback) {
     log.info("found stored callback params, exchanging code for tokens");
@@ -72,7 +71,6 @@ async function initAuth() {
     }
   }
 
-  // Case 2: fresh start — build login URL, open external browser, wait for deep-link callback
   log.info("no pending callback — starting fresh login flow");
   try {
     const state = crypto.randomUUID();
