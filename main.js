@@ -6,10 +6,12 @@ const {
   Menu,
   dialog,
   nativeImage,
+  safeStorage,
 } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const path = require("path");
 const http = require("http");
+const fs = require("fs");
 require("dotenv").config();
 const {
   autoConnect,
@@ -244,6 +246,35 @@ ipcMain.handle("get-env", () => ({
   LOGIN_CLIENT_ID: process.env.LOGIN_CLIENT_ID,
   REDIRECT_URI: process.env.REDIRECT_URI,
 }));
+
+function tokensPath() {
+  return path.join(app.getPath("userData"), "tokens.enc");
+}
+ipcMain.handle("save-tokens", (_e, tokens) => {
+  try {
+    const enc = safeStorage.encryptString(JSON.stringify(tokens));
+    fs.writeFileSync(tokensPath(), enc);
+  } catch (err) {
+    sendError(`[save-tokens] ${err?.stack || err}`);
+  }
+});
+ipcMain.handle("load-tokens", () => {
+  try {
+    if (!fs.existsSync(tokensPath())) return null;
+    const enc = fs.readFileSync(tokensPath());
+    return JSON.parse(safeStorage.decryptString(enc));
+  } catch (err) {
+    sendError(`[load-tokens] ${err?.stack || err}`);
+    return null;
+  }
+});
+ipcMain.handle("clear-tokens", () => {
+  try {
+    if (fs.existsSync(tokensPath())) fs.unlinkSync(tokensPath());
+  } catch (err) {
+    sendError(`[clear-tokens] ${err?.stack || err}`);
+  }
+});
 ipcMain.handle("open-login-url", (_e, url) => {
   authWin = new BrowserWindow({ width: 800, height: 700, title: "Login" });
   authWin.loadURL(url);
