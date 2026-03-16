@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>IoT Scale — Configuration Error</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: monospace;
+        background: #0d0d0d;
+        color: #ccc;
+        height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .card {
+        background: #111;
+        border: 1px solid #2a2a2a;
+        border-left: 4px solid #e53935;
+        border-radius: 6px;
+        padding: 32px 40px;
+        max-width: 520px;
+        width: 90%;
+      }
+      h1 { color: #e53935; font-size: 1rem; margin-bottom: 12px; }
+      p  { color: #666; font-size: 0.8rem; margin-bottom: 20px; line-height: 1.6; }
+      ul { list-style: none; margin-bottom: 24px; }
+      ul li {
+        background: #1a1a1a;
+        border: 1px solid #2a2a2a;
+        color: #f0a500;
+        font-size: 0.8rem;
+        padding: 6px 12px;
+        margin-bottom: 6px;
+        border-radius: 4px;
+      }
+      ul li::before { content: "✗  "; color: #e53935; }
+      .hint { color: #444; font-size: 0.75rem; }
+      .hint code { color: #888; }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>⚠ Missing configuration</h1>
+      <p>The following required environment variables are not set. Create or fix your <code>.env</code> file and restart the app.</p>
+      <ul id="list"></ul>
+      <p class="hint">Expected file location: <code>.env</code> in the app root directory.</p>
+    </div>
+    <script>
+      const params = new URLSearchParams(location.search);
+      const missing = (params.get("missing") || "").split(",").filter(Boolean);
+      const ul = document.getElementById("list");
+      missing.forEach((key) => {
+        const li = document.createElement("li");
+        li.textContent = key;
+        ul.appendChild(li);
+      });
+    </script>
+  </body>
+</html>

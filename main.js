@@ -36,6 +36,31 @@ let win;
 let tray;
 let authWin;
 let authServer;
+let sseClients = new Set();
+
+function sseEmit(event, data) {
+  const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const res of sseClients) res.write(msg);
+}
+
+function startSseServer() {
+  const port = parseInt(process.env.SSE_PORT || "3000", 10);
+  http.createServer((req, res) => {
+    const url = new URL(req.url, `http://localhost:${port}`);
+    if (url.pathname !== "/events") {
+      res.writeHead(404); res.end(); return;
+    }
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive",
+      "Access-Control-Allow-Origin": "*",
+    });
+    res.write("retry: 3000\n\n");
+    sseClients.add(res);
+    req.on("close", () => sseClients.delete(res));
+  }).listen(port, () => console.log(`[sse] listening on http://localhost:${port}/events`));
+}
 
 function startAuthServer() {
   if (authServer) return;
@@ -69,6 +94,12 @@ function startAuthServer() {
   }
 }
 
+const REQUIRED_ENV = ["LOGIN_URL", "LOGIN_REALM", "LOGIN_CLIENT_ID", "REDIRECT_URI"];
+
+function getMissingEnv() {
+  return REQUIRED_ENV.filter((k) => !process.env[k]);
+}
+
 function createWindow() {
   win = new BrowserWindow({
     width: 1100,
@@ -80,7 +111,12 @@ function createWindow() {
       contextIsolation: true,
     },
   });
-  win.loadFile("renderer/index.html");
+  const missing = getMissingEnv();
+  if (missing.length) {
+    win.loadFile("renderer/error.html", { query: { missing: missing.join(",") } });
+  } else {
+    win.loadFile("renderer/index.html");
+  }
   win.once("ready-to-show", () => win.show());
   win.on("close", (e) => {
     e.preventDefault();
@@ -167,6 +203,7 @@ app.whenReady().then(() => {
   });
 
   startAuthServer();
+  startSseServer();
   createWindow();
   createTray();
   autoUpdater.checkForUpdatesAndNotify();
@@ -179,21 +216,22 @@ app.whenReady().then(() => {
 
   autoConnect()
     .then((reader) => {
-      reader.on("connected", (info) =>
-        win?.webContents.send("scale", { event: "connected", ...info }),
-      );
-      reader.on("weight", (data) =>
-        win?.webContents.send("scale", { event: "weight", ...data }),
-      );
-      reader.on("disconnected", () =>
-        win?.webContents.send("scale", { event: "disconnected" }),
-      );
-      reader.on("error", (err) =>
-        win?.webContents.send("scale", {
-          event: "error",
-          message: err.message,
-        }),
-      );
+      reader.on("connected", (info) => {
+        win?.webContents.send("scale", { event: "connected", ...info });
+        sseEmit("connected", info);
+      });
+      reader.on("weight", (data) => {
+        win?.webContents.send("scale", { event: "weight", ...data });
+        sseEmit("weight", data);
+      });
+      reader.on("disconnected", () => {
+        win?.webContents.send("scale", { event: "disconnected" });
+        sseEmit("disconnected", {});
+      });
+      reader.on("error", (err) => {
+        win?.webContents.send("scale", { event: "error", message: err.message });
+        sseEmit("error", { message: err.message });
+      });
     })
     .catch((err) => sendError(`[autoConnect] ${err?.stack || err}`));
 });
