@@ -10,4 +10,8 @@ contextBridge.exposeInMainWorld('scale', {
   reloadWithCallback: (fragment) => ipcRenderer.invoke('reload-with-callback', fragment),
   getPendingAuthUrl:   ()   => ipcRenderer.invoke('get-pending-auth-url'),
   openLoginUrl:        (url) => ipcRenderer.invoke('open-login-url', url),
+  onAppError:     (cb) => ipcRenderer.on('app-error', (_e, msg) => cb(msg)),
+  saveTokens:     (tokens) => ipcRenderer.invoke('save-tokens', tokens),
+  loadTokens:     ()       => ipcRenderer.invoke('load-tokens'),
+  clearTokens:    ()       => ipcRenderer.invoke('clear-tokens'),
 });

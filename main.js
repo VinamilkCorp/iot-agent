@@ -6,10 +6,12 @@ const {
   Menu,
   dialog,
   nativeImage,
+  safeStorage,
 } = require("electron");
 const { autoUpdater } = require("electron-updater");
 const path = require("path");
 const http = require("http");
+const fs = require("fs");
 require("dotenv").config();
 const {
   autoConnect,
@@ -18,37 +20,86 @@ const {
   logger,
 } = require("./src/scale");
 
+function sendError(msg) {
+  win?.webContents.send("app-error", msg);
+}
+
+process.on("uncaughtException", (err) => {
+  console.error("[uncaughtException]", err);
+  sendError(`[uncaughtException] ${err?.stack || err}`);
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("[unhandledRejection]", reason);
+  sendError(`[unhandledRejection] ${reason?.stack || reason}`);
+});
+
 let win;
 let tray;
 let authWin;
 let authServer;
+let sseClients = new Set();
+
+function sseEmit(event, data) {
+  const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  for (const res of sseClients) res.write(msg);
+}
+
+function startSseServer() {
+  const port = parseInt(process.env.SSE_PORT || "3000", 10);
+  http.createServer((req, res) => {
+    const url = new URL(req.url, `http://localhost:${port}`);
+    if (url.pathname !== "/events") {
+      res.writeHead(404); res.end(); return;
+    }
+    res.writeHead(200, {
+      "Content-Type": "text/event-stream",
+      "Cache-Control": "no-cache",
+      "Connection": "keep-alive",
+      "Access-Control-Allow-Origin": "*",
+    });
+    res.write("retry: 3000\n\n");
+    sseClients.add(res);
+    req.on("close", () => sseClients.delete(res));
+  }).listen(port, () => console.log(`[sse] listening on http://localhost:${port}/events`));
+}
 
 function startAuthServer() {
   if (authServer) return;
-  const redirectUri = new URL(process.env.REDIRECT_URI);
-  const port = redirectUri.port || 80;
-  authServer = http
-    .createServer((req, res) => {
-      const url = new URL(req.url, redirectUri.origin);
-      if (url.pathname === redirectUri.pathname) {
-        const params = url.search.substring(1);
-        if (authWin) {
-          authWin.close();
-          authWin = null;
+  try {
+    const redirectUri = new URL(process.env.REDIRECT_URI);
+    const port = redirectUri.port || 80;
+    authServer = http
+      .createServer((req, res) => {
+        try {
+          const url = new URL(req.url, redirectUri.origin);
+          if (url.pathname === redirectUri.pathname) {
+            const params = url.search.substring(1);
+            if (authWin) { authWin.close(); authWin = null; }
+            win?.webContents.send("auth-callback", params);
+            if (win) { win.show(); win.focus(); }
+            res.writeHead(200, { "Content-Type": "text/html" });
+            res.end("<html><body><p>Login successful.</p></body></html>");
+          } else {
+            res.writeHead(404);
+            res.end();
+          }
+        } catch (err) {
+          sendError(`[authServer:request] ${err?.stack || err}`);
+          res.writeHead(500); res.end();
         }
-        win?.webContents.send("auth-callback", params);
-        if (win) {
-          win.show();
-          win.focus();
-        }
-        res.writeHead(200, { "Content-Type": "text/html" });
-        res.end("<html><body><p>Login successful.</p></body></html>");
-      } else {
-        res.writeHead(404);
-        res.end();
-      }
-    })
-    .listen(port);
+      })
+      .listen(port);
+    authServer.on("error", (err) => sendError(`[authServer] ${err?.stack || err}`));
+  } catch (err) {
+    sendError(`[startAuthServer] ${err?.stack || err}`);
+  }
+}
+
+const REQUIRED_ENV = ["LOGIN_URL", "LOGIN_REALM", "LOGIN_CLIENT_ID", "REDIRECT_URI"];
+
+function getMissingEnv() {
+  return REQUIRED_ENV.filter((k) => !process.env[k]);
 }
 
 function createWindow() {
@@ -62,7 +113,13 @@ function createWindow() {
       contextIsolation: true,
     },
   });
-  win.loadFile("renderer/index.html");
+  const missing = getMissingEnv();
+  if (missing.length) {
+    win.loadFile("renderer/error.html", { query: { missing: missing.join(",") } });
+  } else {
+    win.loadFile("renderer/index.html");
+  }
+  win.once("ready-to-show", () => win.show());
   win.on("close", (e) => {
     e.preventDefault();
     win.hide();
@@ -81,6 +138,11 @@ function createTray() {
   tray.setToolTip("IoT Scale");
   tray.setContextMenu(
     Menu.buildFromTemplate([
+      {
+        label: "Open",
+        click: () => win.show(),
+      },
+      { type: "separator" },
       {
         label: "Debug",
         click: () => {
@@ -143,6 +205,7 @@ app.whenReady().then(() => {
   });
 
   startAuthServer();
+  startSseServer();
   createWindow();
   createTray();
   autoUpdater.checkForUpdatesAndNotify();
@@ -155,23 +218,24 @@ app.whenReady().then(() => {
 
   autoConnect()
     .then((reader) => {
-      reader.on("connected", (info) =>
-        win?.webContents.send("scale", { event: "connected", ...info }),
-      );
-      reader.on("weight", (data) =>
-        win?.webContents.send("scale", { event: "weight", ...data }),
-      );
-      reader.on("disconnected", () =>
-        win?.webContents.send("scale", { event: "disconnected" }),
-      );
-      reader.on("error", (err) =>
-        win?.webContents.send("scale", {
-          event: "error",
-          message: err.message,
-        }),
-      );
+      reader.on("connected", (info) => {
+        win?.webContents.send("scale", { event: "connected", ...info });
+        sseEmit("connected", info);
+      });
+      reader.on("weight", (data) => {
+        win?.webContents.send("scale", { event: "weight", ...data });
+        sseEmit("weight", data);
+      });
+      reader.on("disconnected", () => {
+        win?.webContents.send("scale", { event: "disconnected" });
+        sseEmit("disconnected", {});
+      });
+      reader.on("error", (err) => {
+        win?.webContents.send("scale", { event: "error", message: err.message });
+        sseEmit("error", { message: err.message });
+      });
     })
-    .catch((err) => console.error("[main] autoConnect error:", err));
+    .catch((err) => sendError(`[autoConnect] ${err?.stack || err}`));
 });
 
 ipcMain.handle("list-ports", () => listPorts());
@@ -182,6 +246,35 @@ ipcMain.handle("get-env", () => ({
   LOGIN_CLIENT_ID: process.env.LOGIN_CLIENT_ID,
   REDIRECT_URI: process.env.REDIRECT_URI,
 }));
+
+function tokensPath() {
+  return path.join(app.getPath("userData"), "tokens.enc");
+}
+ipcMain.handle("save-tokens", (_e, tokens) => {
+  try {
+    const enc = safeStorage.encryptString(JSON.stringify(tokens));
+    fs.writeFileSync(tokensPath(), enc);
+  } catch (err) {
+    sendError(`[save-tokens] ${err?.stack || err}`);
+  }
+});
+ipcMain.handle("load-tokens", () => {
+  try {
+    if (!fs.existsSync(tokensPath())) return null;
+    const enc = fs.readFileSync(tokensPath());
+    return JSON.parse(safeStorage.decryptString(enc));
+  } catch (err) {
+    sendError(`[load-tokens] ${err?.stack || err}`);
+    return null;
+  }
+});
+ipcMain.handle("clear-tokens", () => {
+  try {
+    if (fs.existsSync(tokensPath())) fs.unlinkSync(tokensPath());
+  } catch (err) {
+    sendError(`[clear-tokens] ${err?.stack || err}`);
+  }
+});
 ipcMain.handle("open-login-url", (_e, url) => {
   authWin = new BrowserWindow({ width: 800, height: 700, title: "Login" });
   authWin.loadURL(url);
