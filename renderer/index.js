@@ -62,6 +62,16 @@ function log(msg, cls = 'info', time = new Date().toLocaleTimeString()) {
 }
 function clearLog() { logEl.innerHTML = ''; }
 
+// ── Global error handlers ────────────────────────────────────────────────────
+window.scale.onAppError((msg) => log(`[main] ${msg}`, 'error'));
+window.onerror = (_msg, _src, _line, _col, err) => {
+  log(`[renderer] ${err?.stack || err || _msg}`, 'error');
+  return true;
+};
+window.onunhandledrejection = (e) => {
+  log(`[renderer:promise] ${e.reason?.stack || e.reason}`, 'error');
+};
+
 // ── Ports ─────────────────────────────────────────────────────────────────────
 function renderPortsTable(ports, scalePaths = new Set()) {
   if (!ports.length) return '<span class="empty">No ports found</span>';

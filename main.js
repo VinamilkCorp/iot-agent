@@ -18,6 +18,20 @@ const {
   logger,
 } = require("./src/scale");
 
+function sendError(msg) {
+  win?.webContents.send("app-error", msg);
+}
+
+process.on("uncaughtException", (err) => {
+  console.error("[uncaughtException]", err);
+  sendError(`[uncaughtException] ${err?.stack || err}`);
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("[unhandledRejection]", reason);
+  sendError(`[unhandledRejection] ${reason?.stack || reason}`);
+});
+
 let win;
 let tray;
 let authWin;
@@ -25,30 +39,34 @@ let authServer;
 
 function startAuthServer() {
   if (authServer) return;
-  const redirectUri = new URL(process.env.REDIRECT_URI);
-  const port = redirectUri.port || 80;
-  authServer = http
-    .createServer((req, res) => {
-      const url = new URL(req.url, redirectUri.origin);
-      if (url.pathname === redirectUri.pathname) {
-        const params = url.search.substring(1);
-        if (authWin) {
-          authWin.close();
-          authWin = null;
+  try {
+    const redirectUri = new URL(process.env.REDIRECT_URI);
+    const port = redirectUri.port || 80;
+    authServer = http
+      .createServer((req, res) => {
+        try {
+          const url = new URL(req.url, redirectUri.origin);
+          if (url.pathname === redirectUri.pathname) {
+            const params = url.search.substring(1);
+            if (authWin) { authWin.close(); authWin = null; }
+            win?.webContents.send("auth-callback", params);
+            if (win) { win.show(); win.focus(); }
+            res.writeHead(200, { "Content-Type": "text/html" });
+            res.end("<html><body><p>Login successful.</p></body></html>");
+          } else {
+            res.writeHead(404);
+            res.end();
+          }
+        } catch (err) {
+          sendError(`[authServer:request] ${err?.stack || err}`);
+          res.writeHead(500); res.end();
         }
-        win?.webContents.send("auth-callback", params);
-        if (win) {
-          win.show();
-          win.focus();
-        }
-        res.writeHead(200, { "Content-Type": "text/html" });
-        res.end("<html><body><p>Login successful.</p></body></html>");
-      } else {
-        res.writeHead(404);
-        res.end();
-      }
-    })
-    .listen(port);
+      })
+      .listen(port);
+    authServer.on("error", (err) => sendError(`[authServer] ${err?.stack || err}`));
+  } catch (err) {
+    sendError(`[startAuthServer] ${err?.stack || err}`);
+  }
 }
 
 function createWindow() {
@@ -63,6 +81,7 @@ function createWindow() {
     },
   });
   win.loadFile("renderer/index.html");
+  win.once("ready-to-show", () => win.show());
   win.on("close", (e) => {
     e.preventDefault();
     win.hide();
@@ -81,6 +100,11 @@ function createTray() {
   tray.setToolTip("IoT Scale");
   tray.setContextMenu(
     Menu.buildFromTemplate([
+      {
+        label: "Open",
+        click: () => win.show(),
+      },
+      { type: "separator" },
       {
         label: "Debug",
         click: () => {
@@ -171,7 +195,7 @@ app.whenReady().then(() => {
         }),
       );
     })
-    .catch((err) => console.error("[main] autoConnect error:", err));
+    .catch((err) => sendError(`[autoConnect] ${err?.stack || err}`));
 });
 
 ipcMain.handle("list-ports", () => listPorts());
