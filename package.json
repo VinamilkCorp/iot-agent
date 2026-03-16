@@ -22,6 +22,10 @@
       "owner": "VinamilkCorp",
       "repo": "iot-agent"
     },
+    "nsis": {
+      "allowToChangeInstallationDirectory": true,
+      "oneClick": false
+    },
     "win": {
       "target": "nsis",
       "protocols": [{ "name": "IoT Scale Auth", "schemes": ["iotscale"] }]
