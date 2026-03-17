@@ -12,7 +12,7 @@ const { autoUpdater } = require("electron-updater");
 const path = require("path");
 const http = require("http");
 const fs = require("fs");
-require("dotenv").config();
+require("dotenv").config({ path: path.join(app.isPackaged ? process.resourcesPath : __dirname, ".env") });
 const {
   autoConnect,
   listPorts,
@@ -39,6 +39,7 @@ let tray;
 let authWin;
 let authServer;
 let sseClients = new Set();
+let isQuitting = process.platform === "darwin";
 
 function sseEmit(event, data) {
   const msg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
@@ -122,6 +123,7 @@ function createWindow() {
   }
   win.once("ready-to-show", () => win.show());
   win.on("close", (e) => {
+    if (isQuitting) return;
     e.preventDefault();
     win.hide();
   });
@@ -155,7 +157,8 @@ function createTray() {
       {
         label: "Exit",
         click: () => {
-          app.exit(0);
+          isQuitting = true;
+          app.quit();
         },
       },
     ]),
@@ -164,6 +167,9 @@ function createTray() {
 }
 
 function askAutoStart() {
+  const flagPath = path.join(app.getPath("userData"), ".autostart-asked");
+  if (fs.existsSync(flagPath)) return;
+  fs.writeFileSync(flagPath, "");
   const choice = dialog.showMessageBoxSync({
     type: "question",
     buttons: ["Yes", "No"],
@@ -212,8 +218,7 @@ app.whenReady().then(() => {
   autoUpdater.checkForUpdatesAndNotify();
 
   const { wasOpenedAtLogin } = app.getLoginItemSettings();
-  if (!wasOpenedAtLogin && app.getLoginItemSettings().openAtLogin === false)
-    askAutoStart();
+  if (!wasOpenedAtLogin) askAutoStart();
 
   logger.on("log", (entry) => win?.webContents.send("log", entry));
 
