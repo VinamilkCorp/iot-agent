@@ -1,6 +1,6 @@
 {
   "name": "iot-scale",
-  "version": "1.0.3",
+  "version": "1.0.5",
   "description": "IoT Scale Desktop App",
   "main": "main.js",
   "scripts": {
@@ -25,9 +25,6 @@
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
-      "installerIcon": "build/installer.ico",
-      "uninstallerIcon": "build/uninstaller.ico",
-      "license": "license.txt",
       "createDesktopShortcut": true,
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": true,
@@ -66,7 +63,10 @@
       "node_modules/keycloak-js/**/*"
     ],
     "extraResources": [
-      { "from": ".env", "to": ".env" }
+      {
+        "from": ".env",
+        "to": ".env"
+      }
     ]
   },
   "dependencies": {
