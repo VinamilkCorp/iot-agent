@@ -97,6 +97,7 @@ function startAuthServer() {
 }
 
 const REQUIRED_ENV = ["LOGIN_URL", "LOGIN_REALM", "LOGIN_CLIENT_ID", "REDIRECT_URI"];
+const AUTH_REQUIRED = process.env.AUTH_REQUIRED !== "false";
 
 function getMissingEnv() {
   return REQUIRED_ENV.filter((k) => !process.env[k]);
@@ -113,7 +114,7 @@ function createWindow() {
       contextIsolation: true,
     },
   });
-  const missing = getMissingEnv();
+  const missing = AUTH_REQUIRED ? getMissingEnv() : [];
   if (missing.length) {
     win.loadFile("renderer/error.html", { query: { missing: missing.join(",") } });
   } else {
@@ -245,6 +246,7 @@ ipcMain.handle("get-env", () => ({
   LOGIN_REALM: process.env.LOGIN_REALM,
   LOGIN_CLIENT_ID: process.env.LOGIN_CLIENT_ID,
   REDIRECT_URI: process.env.REDIRECT_URI,
+  AUTH_REQUIRED,
 }));
 
 function tokensPath() {
