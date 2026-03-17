@@ -1,6 +1,6 @@
 {
   "name": "iot-scale",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "IoT Scale Desktop App",
   "main": "main.js",
   "scripts": {
@@ -28,11 +28,25 @@
     },
     "win": {
       "target": "nsis",
-      "protocols": [{ "name": "IoT Scale Auth", "schemes": ["iotscale"] }]
+      "protocols": [
+        {
+          "name": "IoT Scale Auth",
+          "schemes": [
+            "iotscale"
+          ]
+        }
+      ]
     },
     "mac": {
       "target": "dmg",
-      "protocols": [{ "name": "IoT Scale Auth", "schemes": ["iotscale"] }]
+      "protocols": [
+        {
+          "name": "IoT Scale Auth",
+          "schemes": [
+            "iotscale"
+          ]
+        }
+      ]
     },
     "linux": {
       "target": "AppImage"
