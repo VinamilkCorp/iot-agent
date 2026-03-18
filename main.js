@@ -215,6 +215,29 @@ app.whenReady().then(() => {
   startSseServer();
   createWindow();
   createTray();
+
+  autoUpdater.autoDownload = true;
+  autoUpdater.autoInstallOnAppQuit = true;
+
+  autoUpdater.on("checking-for-update", () =>
+    win?.webContents.send("update-status", { status: "checking" })
+  );
+  autoUpdater.on("update-available", (info) =>
+    win?.webContents.send("update-status", { status: "available", version: info.version })
+  );
+  autoUpdater.on("update-not-available", () =>
+    win?.webContents.send("update-status", { status: "not-available" })
+  );
+  autoUpdater.on("download-progress", ({ percent }) =>
+    win?.webContents.send("update-status", { status: "downloading", percent: Math.floor(percent) })
+  );
+  autoUpdater.on("update-downloaded", (info) =>
+    win?.webContents.send("update-status", { status: "downloaded", version: info.version })
+  );
+  autoUpdater.on("error", (err) =>
+    win?.webContents.send("update-status", { status: "error", message: err.message })
+  );
+
   autoUpdater.checkForUpdatesAndNotify();
 
   const { wasOpenedAtLogin } = app.getLoginItemSettings();
@@ -244,6 +267,7 @@ app.whenReady().then(() => {
     .catch((err) => sendError(`[autoConnect] ${err?.stack || err}`));
 });
 
+ipcMain.on("install-update", () => autoUpdater.quitAndInstall());
 ipcMain.handle("list-ports", () => listPorts());
 ipcMain.handle("list-scale-ports", () => findScalePorts());
 ipcMain.handle("get-env", () => ({
