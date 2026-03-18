@@ -14,8 +14,6 @@ export type ScaleEvent =
   | { event: "error"; message: string };
 ```
 
-### Hook
-
 ```ts
 const SSE_URL = "http://localhost:3000/events";
 const SSE_EVENTS = ["connected", "weight", "disconnected", "error"] as const;
