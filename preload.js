@@ -15,5 +15,5 @@ contextBridge.exposeInMainWorld('scale', {
   installUpdate:  ()   => ipcRenderer.send('install-update'),
   saveTokens:     (tokens) => ipcRenderer.invoke('save-tokens', tokens),
   loadTokens:     ()       => ipcRenderer.invoke('load-tokens'),
-  clearTokens:    ()       => ipcRenderer.invoke('clear-tokens'),
+  signOut:        ()       => ipcRenderer.invoke('sign-out'),
 });

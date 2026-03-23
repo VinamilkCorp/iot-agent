@@ -4,7 +4,9 @@ const { EventEmitter } = require("events");
 const { MODEL_PROFILES, genericParse } = require("./models");
 
 const logger = new EventEmitter();
-function log(level, msg) { logger.emit("log", { level, msg, ts: new Date().toISOString() }); }
+function log(level, msg) {
+  logger.emit("log", { level, msg, ts: new Date().toISOString() });
+}
 
 const KNOWN_VIDS = [
   "0403", // FTDI (most RS232-USB adapters)
@@ -29,19 +31,31 @@ async function findScalePorts() {
       /usb|serial|uart|ch34|cp21|pl23|ftdi/i.test(p.manufacturer || "")
     );
   });
-  log("info", `findScalePorts: ${candidates.length} candidate(s) — ${candidates.map(p => `${p.path} [VID:${p.vendorId||"?"}]`).join(", ") || "none"}`);
+  log(
+    "info",
+    `findScalePorts: ${candidates.length} candidate(s) — ${candidates.map((p) => `${p.path} [VID:${p.vendorId || "?"}]`).join(", ") || "none"}`,
+  );
   return candidates;
 }
 
-const SERIAL_DEFAULTS = { dataBits: 8, stopBits: 1, parity: "none", hupcl: false };
+const SERIAL_DEFAULTS = {
+  dataBits: 8,
+  stopBits: 1,
+  parity: "none",
+  hupcl: false,
+};
 
 function openWithRetry(port, retries = 3, delayMs = 500) {
   return new Promise((resolve, reject) => {
     const attempt = (n) => {
       port.open((err) => {
         if (!err) return resolve();
-        if (n <= 1 || !/SetCommState|code 31/i.test(err.message)) return reject(err);
-        log("warn", `openWithRetry: SetCommState failed, retrying in ${delayMs}ms\u2026 (${n - 1} left)`);
+        if (n <= 1 || !/SetCommState|code 31/i.test(err.message))
+          return reject(err);
+        log(
+          "warn",
+          `openWithRetry: SetCommState failed, retrying in ${delayMs}ms\u2026 (${n - 1} left)`,
+        );
         setTimeout(() => attempt(n - 1), delayMs);
       });
     };
@@ -50,13 +64,23 @@ function openWithRetry(port, retries = 3, delayMs = 500) {
 }
 
 function probePort(path, baudRate, timeout = 3000) {
-  log("info", `probePort: trying ${path} @ ${baudRate} baud (dataBits:${SERIAL_DEFAULTS.dataBits} stopBits:${SERIAL_DEFAULTS.stopBits} parity:${SERIAL_DEFAULTS.parity})`);
+  log(
+    "info",
+    `probePort: trying ${path} @ ${baudRate} baud (dataBits:${SERIAL_DEFAULTS.dataBits} stopBits:${SERIAL_DEFAULTS.stopBits} parity:${SERIAL_DEFAULTS.parity})`,
+  );
   return new Promise((resolve, reject) => {
-    const port = new SerialPort({ path, baudRate, ...SERIAL_DEFAULTS, autoOpen: false });
+    const port = new SerialPort({
+      path,
+      baudRate,
+      ...SERIAL_DEFAULTS,
+      autoOpen: false,
+    });
     const parser = port.pipe(new ReadlineParser({ delimiter: "\r\n" }));
     const timer = setTimeout(() => {
       port.close();
-      const err = new Error(`probePort timeout: no valid data from ${path} @ ${baudRate} baud after ${timeout}ms`);
+      const err = new Error(
+        `probePort timeout: no valid data from ${path} @ ${baudRate} baud after ${timeout}ms`,
+      );
       log("warn", err.message);
       reject(err);
     }, timeout);
@@ -68,26 +92,39 @@ function probePort(path, baudRate, timeout = 3000) {
       if (result) {
         clearTimeout(timer);
         port.close();
-        log("info", `probePort: matched ${path} @ ${baudRate} — sample: "${line.trim()}"`);
+        log(
+          "info",
+          `probePort: matched ${path} @ ${baudRate} — sample: "${line.trim()}"`,
+        );
         resolve({ path, baudRate, sample: line.trim() });
       }
     });
 
-    openWithRetry(port).then(() => {
-      log("info", `probePort: opened ${path} @ ${baudRate}, waiting for data…`);
-    }).catch((err) => {
-      clearTimeout(timer);
-      const isCommStateErr = /SetCommState|code 31/i.test(err.message);
-      log(isCommStateErr ? "warn" : "error", `probePort: failed to open ${path} @ ${baudRate} — ${err.message}`);
-      reject(err);
-    });
+    openWithRetry(port)
+      .then(() => {
+        log(
+          "info",
+          `probePort: opened ${path} @ ${baudRate}, waiting for data…`,
+        );
+      })
+      .catch((err) => {
+        clearTimeout(timer);
+        const isCommStateErr = /SetCommState|code 31/i.test(err.message);
+        log(
+          isCommStateErr ? "warn" : "error",
+          `probePort: failed to open ${path} @ ${baudRate} — ${err.message}`,
+        );
+        reject(err);
+      });
   });
 }
 
 async function detectScale(timeout = 3000) {
   const candidates = await findScalePorts();
   if (!candidates.length) {
-    const err = new Error("detectScale: no USB-serial ports found — check device connection and drivers");
+    const err = new Error(
+      "detectScale: no USB-serial ports found — check device connection and drivers",
+    );
     log("error", err.message);
     throw err;
   }
@@ -97,7 +134,10 @@ async function detectScale(timeout = 3000) {
     4800,
     19200,
   ];
-  log("info", `detectScale: probing ${candidates.length} port(s) × ${baudRates.length} baud rates: [${baudRates.join(", ")}]`);
+  log(
+    "info",
+    `detectScale: probing ${candidates.length} port(s) × ${baudRates.length} baud rates: [${baudRates.join(", ")}]`,
+  );
 
   const probes = candidates.flatMap((c) =>
     baudRates.map((b) => probePort(c.path, b, timeout).catch(() => null)),
@@ -106,16 +146,21 @@ async function detectScale(timeout = 3000) {
   const results = await Promise.all(probes);
   const found = results.find(Boolean);
   if (!found) {
-    const err = new Error(`detectScale: scale not responding on any candidate port [${candidates.map(c => c.path).join(", ")}]`);
+    const err = new Error(
+      `detectScale: scale not responding on any candidate port [${candidates.map((c) => c.path).join(", ")}]`,
+    );
     log("error", err.message);
     throw err;
   }
-  log("info", `detectScale: scale detected — ${found.path} @ ${found.baudRate} baud`);
+  log(
+    "info",
+    `detectScale: scale detected — ${found.path} @ ${found.baudRate} baud`,
+  );
   return found;
 }
 
 class ScaleReader extends EventEmitter {
-  constructor({ path, baudRate = 9600, weightDelta = 0.001 } = {}) {
+  constructor({ path, baudRate = 9600, weightDelta = 0.1 } = {}) {
     super();
     this.path = path;
     this.baudRate = baudRate;
@@ -135,7 +180,10 @@ class ScaleReader extends EventEmitter {
   }
 
   connect() {
-    log("info", `ScaleReader.connect: opening ${this.path} @ ${this.baudRate} baud`);
+    log(
+      "info",
+      `ScaleReader.connect: opening ${this.path} @ ${this.baudRate} baud`,
+    );
     this._port = new SerialPort({
       path: this.path,
       baudRate: this.baudRate,
@@ -144,26 +192,41 @@ class ScaleReader extends EventEmitter {
     });
     const parser = this._port.pipe(new ReadlineParser({ delimiter: "\r\n" }));
 
-    openWithRetry(this._port).then(() => {
-      log("info", `ScaleReader.connect: port open — ${this.path} @ ${this.baudRate} baud`);
-      this.emit("connected", { path: this.path, baudRate: this.baudRate });
-    }).catch((err) => {
-      const isCommStateErr = /SetCommState|code 31/i.test(err.message);
-      const detail = isCommStateErr
-        ? `${err.message} — Windows driver rejected settings for ${this.path}, will retry`
-        : `${err.message} (code:${err.cause?.errno ?? err.errno ?? "?"})` ;
-      log(isCommStateErr ? "warn" : "error", `ScaleReader.connect: failed to open ${this.path} — ${detail}`);
-      this.emit("error", Object.assign(err, { detail }));
-      this._scheduleReconnect();
-    });
+    openWithRetry(this._port)
+      .then(() => {
+        log(
+          "info",
+          `ScaleReader.connect: port open — ${this.path} @ ${this.baudRate} baud`,
+        );
+        this.emit("connected", { path: this.path, baudRate: this.baudRate });
+      })
+      .catch((err) => {
+        const isCommStateErr = /SetCommState|code 31/i.test(err.message);
+        const detail = isCommStateErr
+          ? `${err.message} — Windows driver rejected settings for ${this.path}, will retry`
+          : `${err.message} (code:${err.cause?.errno ?? err.errno ?? "?"})`;
+        log(
+          isCommStateErr ? "warn" : "error",
+          `ScaleReader.connect: failed to open ${this.path} — ${detail}`,
+        );
+        this.emit("error", Object.assign(err, { detail }));
+        this._scheduleReconnect();
+      });
 
     parser.on("data", (line) => {
       const trimmed = line.trim();
       const data = this._detectModel(trimmed);
       if (data) {
-        if (this._lastWeight !== null && Math.abs(data.weight - this._lastWeight) < this._weightDelta) return;
+        if (
+          this._lastWeight !== null &&
+          Math.abs(data.weight - this._lastWeight) < this._weightDelta
+        )
+          return;
         this._lastWeight = data.weight;
-        log("info", `ScaleReader: weight=${data.weight} ${data.unit} model=${data.model} raw="${trimmed}"`);
+        log(
+          "info",
+          `ScaleReader: weight=${data.weight} ${data.unit} model=${data.model} raw="${trimmed}"`,
+        );
         this.emit("weight", data);
       } else {
         log("warn", `ScaleReader: unrecognised line — "${trimmed}"`);
@@ -178,7 +241,10 @@ class ScaleReader extends EventEmitter {
     });
 
     this._port.on("error", (err) => {
-      log("error", `ScaleReader: port error on ${this.path} — ${err.message} (code:${err.cause?.errno ?? err.errno ?? "?"}${err.cause?.code ? " " + err.cause.code : err.code ? " " + err.code : ""})`);
+      log(
+        "error",
+        `ScaleReader: port error on ${this.path} — ${err.message} (code:${err.cause?.errno ?? err.errno ?? "?"}${err.cause?.code ? " " + err.cause.code : err.code ? " " + err.code : ""})`,
+      );
       this.emit("error", err);
       this._scheduleReconnect();
     });
@@ -243,11 +309,16 @@ async function autoConnect(options = {}) {
   log("info", "autoConnect: starting…");
   return new Promise((resolve) => {
     const tryConnect = (detected) => {
-      log("info", `autoConnect: connecting to ${detected.path} @ ${detected.baudRate} baud`);
+      log(
+        "info",
+        `autoConnect: connecting to ${detected.path} @ ${detected.baudRate} baud`,
+      );
       const reader = new ScaleReader({
         path: detected.path,
         baudRate: detected.baudRate,
-        ...(options.weightDelta !== undefined && { weightDelta: options.weightDelta }),
+        ...(options.weightDelta !== undefined && {
+          weightDelta: options.weightDelta,
+        }),
       });
       reader.connect();
       resolve(reader);
@@ -256,7 +327,10 @@ async function autoConnect(options = {}) {
     detectScale(options.probeTimeout)
       .then(tryConnect)
       .catch((err) => {
-        log("warn", `autoConnect: initial detect failed (${err.message}) — watching for device…`);
+        log(
+          "warn",
+          `autoConnect: initial detect failed (${err.message}) — watching for device…`,
+        );
         const watcher = new ScaleWatcher(options);
         watcher.once("scaleFound", (detected) => {
           watcher.stop();

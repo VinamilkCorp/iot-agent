@@ -12,7 +12,9 @@ const { autoUpdater } = require("electron-updater");
 const path = require("path");
 const http = require("http");
 const fs = require("fs");
-require("dotenv").config({ path: path.join(app.isPackaged ? process.resourcesPath : __dirname, ".env") });
+require("dotenv").config({
+  path: path.join(app.isPackaged ? process.resourcesPath : __dirname, ".env"),
+});
 const {
   autoConnect,
   listPorts,
@@ -48,21 +50,27 @@ function sseEmit(event, data) {
 
 function startSseServer() {
   const port = parseInt(process.env.SSE_PORT || "3000", 10);
-  http.createServer((req, res) => {
-    const url = new URL(req.url, `http://localhost:${port}`);
-    if (url.pathname !== "/events") {
-      res.writeHead(404); res.end(); return;
-    }
-    res.writeHead(200, {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      "Connection": "keep-alive",
-      "Access-Control-Allow-Origin": "*",
-    });
-    res.write("retry: 3000\n\n");
-    sseClients.add(res);
-    req.on("close", () => sseClients.delete(res));
-  }).listen(port, () => console.log(`[sse] listening on http://localhost:${port}/events`));
+  http
+    .createServer((req, res) => {
+      const url = new URL(req.url, `http://localhost:${port}`);
+      if (url.pathname !== "/events") {
+        res.writeHead(404);
+        res.end();
+        return;
+      }
+      res.writeHead(200, {
+        "Content-Type": "text/event-stream",
+        "Cache-Control": "no-cache",
+        Connection: "keep-alive",
+        "Access-Control-Allow-Origin": "*",
+      });
+      res.write("retry: 3000\n\n");
+      sseClients.add(res);
+      req.on("close", () => sseClients.delete(res));
+    })
+    .listen(port, () =>
+      console.log(`[sse] listening on http://localhost:${port}/events`),
+    );
 }
 
 function startAuthServer() {
@@ -76,9 +84,15 @@ function startAuthServer() {
           const url = new URL(req.url, redirectUri.origin);
           if (url.pathname === redirectUri.pathname) {
             const params = url.search.substring(1);
-            if (authWin) { authWin.close(); authWin = null; }
+            if (authWin) {
+              authWin.close();
+              authWin = null;
+            }
             win?.webContents.send("auth-callback", params);
-            if (win) { win.show(); win.focus(); }
+            if (win) {
+              win.show();
+              win.focus();
+            }
             res.writeHead(200, { "Content-Type": "text/html" });
             res.end("<html><body><p>Login successful.</p></body></html>");
           } else {
@@ -87,17 +101,25 @@ function startAuthServer() {
           }
         } catch (err) {
           sendError(`[authServer:request] ${err?.stack || err}`);
-          res.writeHead(500); res.end();
+          res.writeHead(500);
+          res.end();
         }
       })
       .listen(port);
-    authServer.on("error", (err) => sendError(`[authServer] ${err?.stack || err}`));
+    authServer.on("error", (err) =>
+      sendError(`[authServer] ${err?.stack || err}`),
+    );
   } catch (err) {
     sendError(`[startAuthServer] ${err?.stack || err}`);
   }
 }
 
-const REQUIRED_ENV = ["LOGIN_URL", "LOGIN_REALM", "LOGIN_CLIENT_ID", "REDIRECT_URI"];
+const REQUIRED_ENV = [
+  "LOGIN_URL",
+  "LOGIN_REALM",
+  "LOGIN_CLIENT_ID",
+  "REDIRECT_URI",
+];
 const AUTH_REQUIRED = process.env.AUTH_REQUIRED !== "false";
 
 function getMissingEnv() {
@@ -117,7 +139,9 @@ function createWindow() {
   });
   const missing = AUTH_REQUIRED ? getMissingEnv() : [];
   if (missing.length) {
-    win.loadFile("renderer/error.html", { query: { missing: missing.join(",") } });
+    win.loadFile("renderer/error.html", {
+      query: { missing: missing.join(",") },
+    });
   } else {
     win.loadFile("renderer/index.html");
   }
@@ -151,6 +175,19 @@ function createTray() {
         click: () => {
           win.show();
           win.webContents.openDevTools();
+        },
+      },
+      { type: "separator" },
+      {
+        label: "Sign out",
+        click: () => {
+          try {
+            if (fs.existsSync(tokensPath())) fs.unlinkSync(tokensPath());
+          } catch (err) {
+            sendError(`[sign-out] ${err?.stack || err}`);
+          }
+          win?.loadFile("renderer/index.html");
+          win?.show();
         },
       },
       { type: "separator" },
@@ -191,6 +228,10 @@ app.on("second-instance", (_e, argv) => {
   pendingAuthUrl = argv.find((a) => a.startsWith("iotscale://")) ?? null;
   console.log("[main] second-instance argv:", argv);
   console.log("[main] pendingAuthUrl:", pendingAuthUrl);
+  if (authWin) {
+    authWin.close();
+    authWin = null;
+  }
   if (pendingAuthUrl) win?.webContents.send("auth-callback", pendingAuthUrl);
   if (win) {
     win.show();
@@ -204,6 +245,10 @@ app.whenReady().then(() => {
   // macOS: Keycloak opens iotscale:// via open-url event
   app.on("open-url", (_e, url) => {
     pendingAuthUrl = url;
+    if (authWin) {
+      authWin.close();
+      authWin = null;
+    }
     win?.webContents.send("auth-callback", url);
     if (win) {
       win.show();
@@ -220,22 +265,34 @@ app.whenReady().then(() => {
   autoUpdater.autoInstallOnAppQuit = true;
 
   autoUpdater.on("checking-for-update", () =>
-    win?.webContents.send("update-status", { status: "checking" })
+    win?.webContents.send("update-status", { status: "checking" }),
   );
   autoUpdater.on("update-available", (info) =>
-    win?.webContents.send("update-status", { status: "available", version: info.version })
+    win?.webContents.send("update-status", {
+      status: "available",
+      version: info.version,
+    }),
   );
   autoUpdater.on("update-not-available", () =>
-    win?.webContents.send("update-status", { status: "not-available" })
+    win?.webContents.send("update-status", { status: "not-available" }),
   );
   autoUpdater.on("download-progress", ({ percent }) =>
-    win?.webContents.send("update-status", { status: "downloading", percent: Math.floor(percent) })
+    win?.webContents.send("update-status", {
+      status: "downloading",
+      percent: Math.floor(percent),
+    }),
   );
   autoUpdater.on("update-downloaded", (info) =>
-    win?.webContents.send("update-status", { status: "downloaded", version: info.version })
+    win?.webContents.send("update-status", {
+      status: "downloaded",
+      version: info.version,
+    }),
   );
   autoUpdater.on("error", (err) =>
-    win?.webContents.send("update-status", { status: "error", message: err.message })
+    win?.webContents.send("update-status", {
+      status: "error",
+      message: err.message,
+    }),
   );
 
   autoUpdater.checkForUpdatesAndNotify();
@@ -260,7 +317,10 @@ app.whenReady().then(() => {
         sseEmit("disconnected", {});
       });
       reader.on("error", (err) => {
-        win?.webContents.send("scale", { event: "error", message: err.message });
+        win?.webContents.send("scale", {
+          event: "error",
+          message: err.message,
+        });
         sseEmit("error", { message: err.message });
       });
     })
@@ -305,6 +365,14 @@ ipcMain.handle("clear-tokens", () => {
   } catch (err) {
     sendError(`[clear-tokens] ${err?.stack || err}`);
   }
+});
+ipcMain.handle("sign-out", () => {
+  try {
+    if (fs.existsSync(tokensPath())) fs.unlinkSync(tokensPath());
+  } catch (err) {
+    sendError(`[sign-out] ${err?.stack || err}`);
+  }
+  win?.loadFile("renderer/index.html");
 });
 ipcMain.handle("open-login-url", (_e, url) => {
   authWin = new BrowserWindow({ width: 800, height: 700, title: "Login" });
