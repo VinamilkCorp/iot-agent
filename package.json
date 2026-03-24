@@ -1,8 +1,12 @@
 {
   "name": "iot-scale",
-  "version": "1.0.7",
+  "version": "1.1.2",
   "description": "IoT Scale Desktop App",
   "main": "main.js",
+  "author": {
+    "name": "Vinamilk",
+    "email": "tavan@vinamilk.com.vn"
+  },
   "scripts": {
     "start": "electron .",
     "build": "electron-builder",
@@ -10,7 +14,7 @@
     "build:mac": "electron-builder --mac",
     "build:linux": "electron-builder --linux",
     "publish": "electron-builder --publish always",
-    "publish:win": "electron-builder --win --publish always",
+    "publish:win": "electron-builder --win --x64 --publish always",
     "publish:mac": "electron-builder --mac --publish always",
     "publish:all": "electron-builder --win --mac --publish always"
   },
@@ -31,7 +35,10 @@
       "include": "build/installer.nsh"
     },
     "win": {
-      "target": "nsis",
+      "target": [
+        "dir",
+        "zip"
+      ],
       "protocols": [
         {
           "name": "IoT Scale Auth",
