@@ -1,12 +1,8 @@
 !macro customInstall
-  ; Kill running instance before installing
-  nsExec::Exec 'taskkill /F /IM "IoT Scale.exe" /T'
+  SetOutPath "$INSTDIR\resources\drivers\CH341SER"
+  ExecWait '"$INSTDIR\resources\drivers\CH341SER\CH341SER.EXE" /S' $0
+  DetailPrint "CH340/CH341 driver install exit code: $0"
 !macroend
 
 !macro customUnInstall
-  ; Remove autostart registry entry
-  DeleteRegValue HKCU "Software\Microsoft\Windows\CurrentVersion\Run" "IoT Scale"
-
-  ; Remove custom protocol handler
-  DeleteRegKey HKCU "Software\Classes\iotscale"
 !macroend

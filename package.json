@@ -72,11 +72,16 @@
       {
         "from": ".env",
         "to": ".env"
+      },
+      {
+        "from": "drivers/CH341SER",
+        "to": "drivers/CH341SER"
       }
     ]
   },
   "dependencies": {
     "@serialport/parser-readline": "^12.0.0",
+    "ws": "^8.18.0",
     "electron-updater": "^6.1.7",
     "keycloak-js": "^26.2.3",
     "dotenv": "^16.0.0",

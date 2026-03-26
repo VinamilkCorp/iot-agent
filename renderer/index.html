@@ -423,10 +423,11 @@
               overlay.style.display = "none";
               break;
             case "error":
-              overlay.style.display = "flex";
-              msg.textContent =
-                "Update check failed. Please download the latest version manually.";
-              msg.style.color = "#e53935";
+              overlay.style.display = "none";
+              const btn = document.getElementById("btn-check-update");
+              btn.title = data.message || "Update check failed";
+              btn.style.borderColor = "#e53935";
+              btn.style.color = "#e53935";
               break;
           }
         });
