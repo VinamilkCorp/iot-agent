@@ -191,7 +191,6 @@
         background: #555;
       }
 
-
       #login-screen {
         position: fixed;
         inset: 0;
@@ -244,7 +243,38 @@
 
     <header>
       <h1>⚖ IoT Scale Dashboard</h1>
-      <button id="btn-signout" onclick="window.scale.signOut()" style="background:#1e1e1e;border:1px solid #333;color:#888;padding:4px 12px;cursor:pointer;border-radius:4px;font-family:monospace;font-size:0.75rem">Sign out</button>
+      <button
+        onclick="window.scale.checkForUpdates()"
+        style="
+          background: #1e1e1e;
+          border: 1px solid #333;
+          color: #888;
+          padding: 4px 12px;
+          cursor: pointer;
+          border-radius: 4px;
+          font-family: monospace;
+          font-size: 0.75rem;
+          margin-right: 6px;
+        "
+      >
+        Check update
+      </button>
+      <button
+        id="btn-signout"
+        onclick="window.scale.signOut()"
+        style="
+          background: #1e1e1e;
+          border: 1px solid #333;
+          color: #888;
+          padding: 4px 12px;
+          cursor: pointer;
+          border-radius: 4px;
+          font-family: monospace;
+          font-size: 0.75rem;
+        "
+      >
+        Sign out
+      </button>
     </header>
 
     <div id="scale-bar">
@@ -301,49 +331,102 @@
     </div>
 
     <!-- Update overlay -->
-    <div id="update-overlay" style="display:none;position:fixed;inset:0;background:#0d0d0d;z-index:1000;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;font-family:monospace;color:#ccc">
-      <h2 style="color:#fff;font-size:1.1rem">⚖ IoT Scale</h2>
-      <p id="update-msg" style="font-size:0.85rem;color:#888"></p>
-      <div id="update-bar-wrap" style="display:none;width:260px;background:#1e1e1e;border-radius:4px;overflow:hidden;height:6px">
-        <div id="update-bar" style="height:100%;width:0%;background:#4caf50;transition:width 0.3s"></div>
+    <div
+      id="update-overlay"
+      style="
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: #0d0d0d;
+        z-index: 1000;
+        display: none;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        font-family: monospace;
+        color: #ccc;
+      "
+    >
+      <h2 style="color: #fff; font-size: 1.1rem">⚖ IoT Scale</h2>
+      <p id="update-msg" style="font-size: 0.85rem; color: #888"></p>
+      <div
+        id="update-bar-wrap"
+        style="
+          display: none;
+          width: 260px;
+          background: #1e1e1e;
+          border-radius: 4px;
+          overflow: hidden;
+          height: 6px;
+        "
+      >
+        <div
+          id="update-bar"
+          style="
+            height: 100%;
+            width: 0%;
+            background: #4caf50;
+            transition: width 0.3s;
+          "
+        ></div>
       </div>
-      <button id="update-install-btn" onclick="window.scale.installUpdate()" style="display:none;background:#1e1e1e;border:1px solid #333;color:#4caf50;padding:6px 18px;cursor:pointer;border-radius:4px;font-family:monospace;font-size:0.85rem">Restart &amp; Install</button>
+      <button
+        id="update-install-btn"
+        onclick="window.scale.installUpdate()"
+        style="
+          display: none;
+          background: #1e1e1e;
+          border: 1px solid #333;
+          color: #4caf50;
+          padding: 6px 18px;
+          cursor: pointer;
+          border-radius: 4px;
+          font-family: monospace;
+          font-size: 0.85rem;
+        "
+      >
+        Restart &amp; Install
+      </button>
     </div>
 
     <script>
       (function () {
-        const overlay = document.getElementById('update-overlay');
-        const msg = document.getElementById('update-msg');
-        const barWrap = document.getElementById('update-bar-wrap');
-        const bar = document.getElementById('update-bar');
-        const installBtn = document.getElementById('update-install-btn');
+        const overlay = document.getElementById("update-overlay");
+        const msg = document.getElementById("update-msg");
+        const barWrap = document.getElementById("update-bar-wrap");
+        const bar = document.getElementById("update-bar");
+        const installBtn = document.getElementById("update-install-btn");
 
         window.scale.onUpdateStatus((data) => {
           switch (data.status) {
-            case 'checking':
-              overlay.style.display = 'flex';
-              msg.textContent = 'Checking for updates…';
+            case "checking":
+              overlay.style.display = "flex";
+              msg.textContent = "Checking for updates…";
               break;
-            case 'available':
+            case "available":
               msg.textContent = `Update v${data.version} found — downloading…`;
-              barWrap.style.display = 'block';
+              barWrap.style.display = "block";
               break;
-            case 'downloading':
-              overlay.style.display = 'flex';
-              barWrap.style.display = 'block';
-              bar.style.width = data.percent + '%';
+            case "downloading":
+              overlay.style.display = "flex";
+              barWrap.style.display = "block";
+              bar.style.width = data.percent + "%";
               msg.textContent = `Downloading update… ${data.percent}%`;
               break;
-            case 'downloaded':
-              bar.style.width = '100%';
+            case "downloaded":
+              bar.style.width = "100%";
               msg.textContent = `v${data.version} ready to install.`;
-              installBtn.style.display = 'block';
+              installBtn.style.display = "block";
               break;
-            case 'not-available':
-              overlay.style.display = 'none';
+            case "not-available":
+              overlay.style.display = "none";
               break;
-            case 'error':
-              overlay.style.display = 'none';
+            case "error":
+              overlay.style.display = "flex";
+              msg.textContent =
+                "Update check failed. Please download the latest version manually.";
+              msg.style.color = "#e53935";
               break;
           }
         });

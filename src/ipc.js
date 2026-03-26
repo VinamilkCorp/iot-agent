@@ -10,6 +10,7 @@ function tokensPath() {
 
 function registerIpcHandlers({ getWin, setAuthWin, getPendingAuthUrl, setPendingAuthUrl, autoUpdater }) {
   ipcMain.on("install-update", () => autoUpdater.quitAndInstall());
+  ipcMain.handle("check-for-updates", () => autoUpdater.checkForUpdates());
   ipcMain.handle("list-ports", () => listPorts());
   ipcMain.handle("list-scale-ports", () => findScalePorts());
   ipcMain.handle("get-env", () => ({

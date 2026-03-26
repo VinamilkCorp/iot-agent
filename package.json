@@ -1,6 +1,6 @@
 {
   "name": "iot-scale",
-  "version": "1.1.4",
+  "version": "1.1.6",
   "description": "IoT Scale Desktop App",
   "main": "main.js",
   "author": {
@@ -14,7 +14,9 @@
     "build:mac": "electron-builder --mac",
     "build:linux": "electron-builder --linux",
     "publish": "electron-builder --publish always",
-    "publish:win": "electron-builder --win --x64 --publish always",
+    "publish:winx64": "electron-builder --win --x64 --publish always",
+    "publish:winN": "electron-builder --win --publish always",
+    "publish:win": "concurrently \"npm run publish:winN\" \"npm run publish:winx64\"",
     "publish:mac": "electron-builder --mac --publish always",
     "publish:all": "electron-builder --win --mac --publish always"
   },
@@ -35,10 +37,7 @@
       "include": "build/installer.nsh"
     },
     "win": {
-      "target": [
-        "dir",
-        "zip"
-      ],
+      "target": "nsis",
       "protocols": [
         {
           "name": "IoT Scale Auth",
@@ -84,6 +83,7 @@
     "serialport": "^12.0.0"
   },
   "devDependencies": {
+    "concurrently": "^9.2.1",
     "electron": "^29.0.0",
     "electron-builder": "^24.9.1"
   }
