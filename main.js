@@ -7,7 +7,12 @@ require("dotenv").config({
 const { autoConnect, logger } = require("./src/scale");
 const { createWindow, askAutoStart } = require("./src/window");
 const { createTray } = require("./src/tray");
-const { startSseServer, startAuthServer, sseEmit, setScaleConnected } = require("./src/servers");
+const {
+  startSseServer,
+  startAuthServer,
+  sseEmit,
+  setScaleConnected,
+} = require("./src/servers");
 const { registerIpcHandlers, tokensPath } = require("./src/ipc");
 const { setupUpdater, autoUpdater } = require("./src/updater");
 
@@ -19,9 +24,13 @@ let _isQuitting = process.platform === "darwin";
 
 const getWin = () => win;
 const getAuthWin = () => authWin;
-const setAuthWin = (v) => { authWin = v; };
+const setAuthWin = (v) => {
+  authWin = v;
+};
 const getPendingAuthUrl = () => pendingAuthUrl;
-const setPendingAuthUrl = (v) => { pendingAuthUrl = v; };
+const setPendingAuthUrl = (v) => {
+  pendingAuthUrl = v;
+};
 const isQuitting = () => _isQuitting;
 
 function sendError(msg) {
@@ -44,9 +53,15 @@ app.on("second-instance", (_e, argv) => {
   pendingAuthUrl = argv.find((a) => a.startsWith("iotscale://")) ?? null;
   console.log("[main] second-instance argv:", argv);
   console.log("[main] pendingAuthUrl:", pendingAuthUrl);
-  if (authWin) { authWin.close(); authWin = null; }
+  if (authWin) {
+    authWin.close();
+    authWin = null;
+  }
   if (pendingAuthUrl) win?.webContents.send("auth-callback", pendingAuthUrl);
-  if (win) { win.show(); win.focus(); }
+  if (win) {
+    win.show();
+    win.focus();
+  }
 });
 
 app.setAsDefaultProtocolClient("iotscale");
@@ -54,9 +69,15 @@ app.setAsDefaultProtocolClient("iotscale");
 app.whenReady().then(() => {
   app.on("open-url", (_e, url) => {
     pendingAuthUrl = url;
-    if (authWin) { authWin.close(); authWin = null; }
+    if (authWin) {
+      authWin.close();
+      authWin = null;
+    }
     win?.webContents.send("auth-callback", url);
-    if (win) { win.show(); win.focus(); }
+    if (win) {
+      win.show();
+      win.focus();
+    }
   });
 
   startAuthServer({ getAuthWin, setAuthWin, getWin, sendError });
@@ -66,7 +87,9 @@ app.whenReady().then(() => {
   tray = createTray({
     getWin,
     getIsQuitting: isQuitting,
-    setIsQuitting: (v) => { _isQuitting = v; },
+    setIsQuitting: (v) => {
+      _isQuitting = v;
+    },
     tokensPath,
     sendError,
     app,
@@ -79,7 +102,13 @@ app.whenReady().then(() => {
 
   logger.on("log", (entry) => win?.webContents.send("log", entry));
 
-  registerIpcHandlers({ getWin, setAuthWin, getPendingAuthUrl, setPendingAuthUrl, autoUpdater });
+  registerIpcHandlers({
+    getWin,
+    setAuthWin,
+    getPendingAuthUrl,
+    setPendingAuthUrl,
+    autoUpdater,
+  });
 
   autoConnect()
     .then((reader) => {
@@ -98,12 +127,17 @@ app.whenReady().then(() => {
         sseEmit("disconnected", {});
       });
       reader.on("error", (err) => {
-        win?.webContents.send("scale", { event: "error", message: err.message });
+        win?.webContents.send("scale", {
+          event: "error",
+          message: err.message,
+        });
         sseEmit("error", { message: err.message });
       });
     })
     .catch((err) => sendError(`[autoConnect] ${err?.stack || err}`));
 });
 
-app.on("window-all-closed", () => { /* keep alive in tray */ });
+app.on("window-all-closed", () => {
+  /* keep alive in tray */
+});
 app.on("activate", () => win?.show());
