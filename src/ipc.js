@@ -8,9 +8,10 @@ function tokensPath() {
   return path.join(app.getPath("userData"), "tokens.enc");
 }
 
-function registerIpcHandlers({ getWin, setAuthWin, getPendingAuthUrl, setPendingAuthUrl, autoUpdater }) {
+function registerIpcHandlers({ getWin, setAuthWin, getPendingAuthUrl, setPendingAuthUrl, autoUpdater, reloadScale }) {
   ipcMain.on("install-update", () => autoUpdater.quitAndInstall());
   ipcMain.handle("check-for-updates", () => autoUpdater.checkForUpdates());
+  ipcMain.handle("reload-scale", () => reloadScale());
   ipcMain.handle("list-ports", () => listPorts());
   ipcMain.handle("list-scale-ports", () => findScalePorts());
   ipcMain.handle("get-env", () => ({

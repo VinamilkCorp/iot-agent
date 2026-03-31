@@ -244,6 +244,22 @@
     <header>
       <h1>⚖ IoT Scale Dashboard</h1>
       <button
+        onclick="window.scale.reloadScale().then(() => { loadPorts(); loadScalePorts(); })"
+        style="
+          background: #1e1e1e;
+          border: 1px solid #333;
+          color: #888;
+          padding: 4px 12px;
+          cursor: pointer;
+          border-radius: 4px;
+          font-family: monospace;
+          font-size: 0.75rem;
+          margin-right: 6px;
+        "
+      >
+        ↺ Reload
+      </button>
+      <button
         onclick="window.scale.checkForUpdates()"
         style="
           background: #1e1e1e;

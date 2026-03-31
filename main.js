@@ -102,39 +102,51 @@ app.whenReady().then(() => {
 
   logger.on("log", (entry) => win?.webContents.send("log", entry));
 
+  let _reader = null;
+  function startScale() {
+    autoConnect()
+      .then((reader) => {
+        _reader = reader;
+        reader.on("connected", (info) => {
+          setScaleConnected(true);
+          win?.webContents.send("scale", { event: "connected", ...info });
+          sseEmit("connected", info);
+        });
+        reader.on("weight", (data) => {
+          win?.webContents.send("scale", { event: "weight", ...data });
+          sseEmit("weight", data);
+        });
+        reader.on("disconnected", () => {
+          setScaleConnected(false);
+          win?.webContents.send("scale", { event: "disconnected" });
+          sseEmit("disconnected", {});
+        });
+        reader.on("error", (err) => {
+          win?.webContents.send("scale", { event: "error", message: err.message });
+          sseEmit("error", { message: err.message });
+        });
+      })
+      .catch((err) => sendError(`[autoConnect] ${err?.stack || err}`));
+  }
+
+  function reloadScale() {
+    _reader?.disconnect();
+    _reader = null;
+    setScaleConnected(false);
+    win?.webContents.send("scale", { event: "disconnected" });
+    startScale();
+  }
+
   registerIpcHandlers({
     getWin,
     setAuthWin,
     getPendingAuthUrl,
     setPendingAuthUrl,
     autoUpdater,
+    reloadScale,
   });
 
-  autoConnect()
-    .then((reader) => {
-      reader.on("connected", (info) => {
-        setScaleConnected(true);
-        win?.webContents.send("scale", { event: "connected", ...info });
-        sseEmit("connected", info);
-      });
-      reader.on("weight", (data) => {
-        win?.webContents.send("scale", { event: "weight", ...data });
-        sseEmit("weight", data);
-      });
-      reader.on("disconnected", () => {
-        setScaleConnected(false);
-        win?.webContents.send("scale", { event: "disconnected" });
-        sseEmit("disconnected", {});
-      });
-      reader.on("error", (err) => {
-        win?.webContents.send("scale", {
-          event: "error",
-          message: err.message,
-        });
-        sseEmit("error", { message: err.message });
-      });
-    })
-    .catch((err) => sendError(`[autoConnect] ${err?.stack || err}`));
+  startScale();
 });
 
 app.on("window-all-closed", () => {
