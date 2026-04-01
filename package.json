@@ -42,10 +42,7 @@
       ]
     },
     "win": {
-      "target": [
-        { "target": "nsis", "arch": ["ia32"] },
-        { "target": "zip",  "arch": ["ia32"] }
-      ],
+      "target": "nsis",
       "protocols": [
         {
           "name": "IoT Scale Auth",

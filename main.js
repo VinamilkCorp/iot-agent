@@ -116,7 +116,11 @@ app.whenReady().then(() => {
 
         reader.on("connected", (info) => {
           setScaleConnected(true);
-          updateScaleState({ model: info.model ?? null });
+          updateScaleState({
+            model: info.model ?? null,
+            error: null,
+            message: null,
+          });
           emit("connected", info);
         });
         reader.on("weight", (data) => {
@@ -124,7 +128,12 @@ app.whenReady().then(() => {
         });
         reader.on("disconnected", () => {
           setScaleConnected(false);
-          updateScaleState({ weight: null, unit: null, error: null, message: null });
+          updateScaleState({
+            weight: null,
+            unit: null,
+            error: null,
+            message: null,
+          });
           emit("disconnected");
         });
         reader.on("error", (err) => {
@@ -139,7 +148,13 @@ app.whenReady().then(() => {
     _reader?.disconnect();
     _reader = null;
     setScaleConnected(false);
-    updateScaleState({ weight: null, unit: null, error: null, message: null, event: "disconnected" });
+    updateScaleState({
+      weight: null,
+      unit: null,
+      error: null,
+      message: null,
+      event: "disconnected",
+    });
     win?.webContents.send("scale", { event: "disconnected" });
     startScale();
   }
