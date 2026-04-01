@@ -4,17 +4,24 @@ const { WebSocketServer } = require("ws");
 let sseClients = new Set();
 let wsClients = new Set();
 let scaleConnected = false;
+let scaleState = { connected: false, weight: null, unit: null, model: null, error: null, message: null, event: null };
+
+function updateScaleState(patch) {
+  Object.assign(scaleState, patch);
+}
 
 function sseEmit(event, data) {
-  const sseMsg = `event: ${event}\ndata: ${JSON.stringify(data)}\n\n`;
+  const payload = { ...scaleState, event, ...data };
+  const sseMsg = `event: ${event}\ndata: ${JSON.stringify(payload)}\n\n`;
   for (const res of sseClients) res.write(sseMsg);
 
-  const wsMsg = JSON.stringify({ event, data });
+  const wsMsg = JSON.stringify(payload);
   for (const ws of wsClients) if (ws.readyState === ws.OPEN) ws.send(wsMsg);
 }
 
 function setScaleConnected(value) {
   scaleConnected = value;
+  scaleState.connected = value;
 }
 
 function startSseServer() {
@@ -25,7 +32,7 @@ function startSseServer() {
 
     if (url.pathname === "/scale/status") {
       res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
-      res.end(JSON.stringify({ connected: scaleConnected }));
+      res.end(JSON.stringify(scaleState));
       return;
     }
 
@@ -42,6 +49,7 @@ function startSseServer() {
       "Access-Control-Allow-Origin": "*",
     });
     res.write("retry: 3000\n\n");
+    res.write(`event: state\ndata: ${JSON.stringify(scaleState)}\n\n`);
     sseClients.add(res);
     req.on("close", () => sseClients.delete(res));
   });
@@ -49,6 +57,7 @@ function startSseServer() {
   const wss = new WebSocketServer({ server, path: "/events" });
   wss.on("connection", (ws) => {
     wsClients.add(ws);
+    ws.send(JSON.stringify(scaleState));
     ws.on("close", () => wsClients.delete(ws));
   });
 
@@ -96,4 +105,4 @@ function startAuthServer({ getAuthWin, setAuthWin, getWin, sendError }) {
   return authServer;
 }
 
-module.exports = { startSseServer, startAuthServer, sseEmit, setScaleConnected };
+module.exports = { startSseServer, startAuthServer, sseEmit, setScaleConnected, updateScaleState };

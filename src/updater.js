@@ -2,6 +2,7 @@ const { autoUpdater } = require("electron-updater");
 
 autoUpdater.autoDownload = true;
 autoUpdater.autoInstallOnAppQuit = true;
+autoUpdater.forceDevUpdateConfig = false;
 
 function setupUpdater(getWin) {
   autoUpdater.on("checking-for-update", () =>

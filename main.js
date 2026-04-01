@@ -12,6 +12,7 @@ const {
   startAuthServer,
   sseEmit,
   setScaleConnected,
+  updateScaleState,
 } = require("./src/servers");
 const { registerIpcHandlers, tokensPath } = require("./src/ipc");
 const { setupUpdater, autoUpdater } = require("./src/updater");
@@ -107,23 +108,28 @@ app.whenReady().then(() => {
     autoConnect()
       .then((reader) => {
         _reader = reader;
+        function emit(event, patch = {}) {
+          updateScaleState({ event, ...patch });
+          sseEmit(event, patch);
+          win?.webContents.send("scale", { event, ...patch });
+        }
+
         reader.on("connected", (info) => {
           setScaleConnected(true);
-          win?.webContents.send("scale", { event: "connected", ...info });
-          sseEmit("connected", info);
+          updateScaleState({ model: info.model ?? null });
+          emit("connected", info);
         });
         reader.on("weight", (data) => {
-          win?.webContents.send("scale", { event: "weight", ...data });
-          sseEmit("weight", data);
+          emit("weight", data);
         });
         reader.on("disconnected", () => {
           setScaleConnected(false);
-          win?.webContents.send("scale", { event: "disconnected" });
-          sseEmit("disconnected", {});
+          updateScaleState({ weight: null, unit: null, error: null, message: null });
+          emit("disconnected");
         });
         reader.on("error", (err) => {
-          win?.webContents.send("scale", { event: "error", message: err.message });
-          sseEmit("error", { message: err.message });
+          updateScaleState({ error: err.message });
+          emit("error", { message: err.message });
         });
       })
       .catch((err) => sendError(`[autoConnect] ${err?.stack || err}`));
@@ -133,6 +139,7 @@ app.whenReady().then(() => {
     _reader?.disconnect();
     _reader = null;
     setScaleConnected(false);
+    updateScaleState({ weight: null, unit: null, error: null, message: null, event: "disconnected" });
     win?.webContents.send("scale", { event: "disconnected" });
     startScale();
   }

@@ -33,12 +33,19 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "runAfterFinish": true,
-      "deleteAppDataOnUninstall": false,
+      "deleteAppDataOnUninstall": true,
       "perMachine": false,
-      "language": "1066"
+      "language": "1066",
+      "include": "build/installer.nsh",
+      "installerLanguages": [
+        "vi_VN"
+      ]
     },
     "win": {
-      "target": "nsis",
+      "target": [
+        { "target": "nsis", "arch": ["ia32"] },
+        { "target": "zip",  "arch": ["ia32"] }
+      ],
       "protocols": [
         {
           "name": "IoT Scale Auth",
