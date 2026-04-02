@@ -90,6 +90,7 @@
     "electron-updater": "^6.1.7",
     "keycloak-js": "^26.2.3",
     "dotenv": "^16.0.0",
+    "kafkajs": "^2.2.4",
     "serialport": "^12.0.0"
   },
   "devDependencies": {

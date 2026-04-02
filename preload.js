@@ -1,6 +1,6 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, app } = require('electron');
 
-const { version } = require('./package.json');
+const version = app?.getVersion() ?? '';
 
 contextBridge.exposeInMainWorld('scale', {
   version,

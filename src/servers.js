@@ -1,10 +1,21 @@
 const http = require("http");
+const { Kafka } = require("kafkajs");
 const { WebSocketServer } = require("ws");
 
 let sseClients = new Set();
 let wsClients = new Set();
 let scaleConnected = false;
-let scaleState = { connected: false, weight: null, unit: null, model: null, path: null, baudRate: null, error: null, message: null, event: null };
+let scaleState = {
+  connected: false,
+  weight: null,
+  unit: null,
+  model: null,
+  path: null,
+  baudRate: null,
+  error: null,
+  message: null,
+  event: null,
+};
 
 function updateScaleState(patch) {
   Object.assign(scaleState, patch);
@@ -32,7 +43,10 @@ function startSseServer() {
     const url = new URL(req.url, `http://localhost:${port}`);
 
     if (url.pathname === "/scale/status") {
-      res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
+      res.writeHead(200, {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+      });
       res.end(JSON.stringify(scaleState));
       return;
     }
@@ -59,10 +73,30 @@ function startSseServer() {
   wss.on("connection", (ws) => {
     wsClients.add(ws);
     ws.send(JSON.stringify(scaleState));
+    ws.on("message", async (raw) => {
+      try {
+        const msg = JSON.parse(raw);
+        if (msg.action !== "start_session") return;
+        const { eventId, sessionId, eventType, sentTime } = msg;
+        if (!kafkaProducer) await initKafka();
+        const topic = process.env.KAFKA_TOPIC;
+        await kafkaProducer.send({
+          topic,
+          messages: [{ value: JSON.stringify({ eventId, sessionId, eventType, sentTime }) }],
+        });
+        console.log(`[kafka] ack sent for session ${sessionId}`);
+        ws.send(JSON.stringify({ action: "session_ack", sessionId, status: "ok" }));
+      } catch (err) {
+        console.error(`[ws:start_session] ${err?.stack || err}`);
+        ws.send(JSON.stringify({ action: "session_ack", status: "error", error: err.message }));
+      }
+    });
     ws.on("close", () => wsClients.delete(ws));
   });
 
-  server.listen(port, () => console.log(`[sse] listening on http://localhost:${port}/events`));
+  server.listen(port, () =>
+    console.log(`[sse] listening on http://localhost:${port}/events`),
+  );
 }
 
 function startAuthServer({ getAuthWin, setAuthWin, getWin, sendError }) {
@@ -99,11 +133,36 @@ function startAuthServer({ getAuthWin, setAuthWin, getWin, sendError }) {
         }
       })
       .listen(port);
-    authServer.on("error", (err) => sendError(`[authServer] ${err?.stack || err}`));
+    authServer.on("error", (err) =>
+      sendError(`[authServer] ${err?.stack || err}`),
+    );
   } catch (err) {
     sendError(`[startAuthServer] ${err?.stack || err}`);
   }
   return authServer;
 }
 
-module.exports = { startSseServer, startAuthServer, sseEmit, setScaleConnected, updateScaleState };
+let kafkaProducer = null;
+
+async function initKafka() {
+  const broker = process.env.KAFKA_BROKER;
+  const topic = process.env.KAFKA_TOPIC;
+  if (!broker || !topic)
+    throw new Error("KAFKA_BROKER and KAFKA_TOPIC env vars are required");
+
+  const brokerHost = broker.replace(/^https?:\/\//, "").replace(/\/$/, "");
+  const kafka = new Kafka({ brokers: [brokerHost] });
+  kafkaProducer = kafka.producer();
+  await kafkaProducer.connect();
+  console.log(`[kafka] connected to ${broker}, topic: ${topic}`);
+  return { producer: kafkaProducer, topic };
+}
+
+module.exports = {
+  startSseServer,
+  startAuthServer,
+  sseEmit,
+  setScaleConnected,
+  updateScaleState,
+  initKafka,
+};
