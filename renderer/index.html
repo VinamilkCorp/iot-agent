@@ -242,7 +242,7 @@
     </div>
 
     <header>
-      <h1>⚖ IoT Scale Dashboard</h1>
+      <h1>⚖ IoT Scale Dashboard <span id="app-version" style="font-size: 0.7rem; color: #555; font-weight: normal;"></span></h1>
       <button
         onclick="window.scale.reloadScale().then(() => { loadPorts(); loadScalePorts(); })"
         style="
@@ -465,6 +465,7 @@
       })();
     </script>
 
+    <script>document.getElementById('app-version').textContent = 'v' + window.scale.version;</script>
     <script type="module" src="auth.js"></script>
     <script src="index.js"></script>
   </body>

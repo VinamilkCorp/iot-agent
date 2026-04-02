@@ -1,6 +1,9 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
+const { version } = require('./package.json');
+
 contextBridge.exposeInMainWorld('scale', {
+  version,
   onEvent:        (cb) => ipcRenderer.on('scale', (_e, data) => cb(data)),
   onLog:          (cb) => ipcRenderer.on('log',   (_e, entry) => cb(entry)),
   listPorts:      ()   => ipcRenderer.invoke('list-ports'),

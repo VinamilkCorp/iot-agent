@@ -45,7 +45,7 @@ const SERIAL_DEFAULTS = {
   hupcl: false,
 };
 
-function openWithRetry(port, retries = 3, delayMs = 500) {
+function openWithRetry(port, retries = 3, delayMs = 1500) {
   return new Promise((resolve, reject) => {
     const attempt = (n) => {
       port.open((err) => {
