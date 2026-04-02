@@ -45,22 +45,45 @@ const SERIAL_DEFAULTS = {
   hupcl: false,
 };
 
-function openWithRetry(port, retries = 3, delayMs = 1500) {
+function isCode31(err) {
+  return (
+    err?.errno === 31 ||
+    err?.cause?.errno === 31 ||
+    /SetCommState|code 31/i.test(err?.message || "")
+  );
+}
+
+function openWithRetry(port, retries = 5, delayMs = 2000) {
   return new Promise((resolve, reject) => {
     const attempt = (n) => {
-      port.open((err) => {
-        if (!err) return resolve();
-        if (n <= 1 || !/SetCommState|code 31/i.test(err.message)) {
-          return reject(err);
+      // Recreate the port instance if it was previously opened/failed
+      // to avoid reusing a stale Windows COM handle
+      const target = n < retries ? _recreatePort(port) : port;
+      target.open((err) => {
+        if (!err) {
+          // Sync back so callers still hold a valid reference
+          Object.assign(port, target);
+          return resolve();
         }
+        if (n <= 1 || !isCode31(err)) return reject(err);
         log(
           "warn",
-          `openWithRetry: SetCommState failed, retrying in ${delayMs}ms\u2026 (${n - 1} left)`,
+          `openWithRetry: code-31/SetCommState, recreating port in ${delayMs}ms… (${n - 1} left)`,
         );
         setTimeout(() => attempt(n - 1), delayMs);
       });
     };
     attempt(retries);
+  });
+}
+
+function _recreatePort(port) {
+  try { port.destroy(); } catch { /* ignore */ }
+  return new SerialPort({
+    path: port.path,
+    baudRate: port.baudRate,
+    ...SERIAL_DEFAULTS,
+    autoOpen: false,
   });
 }
 
@@ -110,9 +133,8 @@ function probePort(path, baudRate, timeout = 3000) {
       })
       .catch((err) => {
         clearTimeout(timer);
-        const isCommStateErr = /SetCommState|code 31/i.test(err.message);
         log(
-          isCommStateErr ? "warn" : "error",
+          isCode31(err) ? "warn" : "error",
           `probePort: failed to open ${path} @ ${baudRate} — ${err.message}`,
         );
         reject(err);
@@ -181,6 +203,10 @@ class ScaleReader extends EventEmitter {
   }
 
   connect() {
+    if (this._port) {
+      try { this._port.destroy(); } catch { /* ignore */ }
+      this._port = null;
+    }
     log(
       "info",
       `ScaleReader.connect: opening ${this.path} @ ${this.baudRate} baud`,
@@ -202,12 +228,11 @@ class ScaleReader extends EventEmitter {
         this.emit("connected", { path: this.path, baudRate: this.baudRate });
       })
       .catch((err) => {
-        const isCommStateErr = /SetCommState|code 31/i.test(err.message);
-        const detail = isCommStateErr
+        const detail = isCode31(err)
           ? `${err.message} — Windows driver rejected settings for ${this.path}, will retry`
           : `${err.message} (code:${err.cause?.errno ?? err.errno ?? "?"})`;
         log(
-          isCommStateErr ? "warn" : "error",
+          isCode31(err) ? "warn" : "error",
           `ScaleReader.connect: failed to open ${this.path} — ${detail}`,
         );
         this.emit("error", Object.assign(err, { detail }));
