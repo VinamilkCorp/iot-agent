@@ -21,6 +21,7 @@ let win = null;
 let tray = null;
 let authWin = null;
 let pendingAuthUrl = null;
+let _reader = null;
 let _isQuitting = process.platform === "darwin";
 
 const getWin = () => win;
@@ -103,7 +104,6 @@ app.whenReady().then(() => {
 
   logger.on("log", (entry) => win?.webContents.send("log", entry));
 
-  let _reader = null;
   function startScale() {
     autoConnect()
       .then((reader) => {
@@ -171,6 +171,10 @@ app.whenReady().then(() => {
   startScale();
 });
 
+app.on("before-quit", () => {
+  _reader?.disconnect();
+  _reader = null;
+});
 app.on("window-all-closed", () => {
   /* keep alive in tray */
 });

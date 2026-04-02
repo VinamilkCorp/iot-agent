@@ -404,6 +404,22 @@
       >
         Restart &amp; Install
       </button>
+      <button
+        id="update-cancel-btn"
+        onclick="window.scale.cancelUpdate(); document.getElementById('update-overlay').style.display='none';"
+        style="
+          background: #1e1e1e;
+          border: 1px solid #333;
+          color: #888;
+          padding: 6px 18px;
+          cursor: pointer;
+          border-radius: 4px;
+          font-family: monospace;
+          font-size: 0.85rem;
+        "
+      >
+        Cancel
+      </button>
     </div>
 
     <script>
@@ -436,14 +452,13 @@
               installBtn.style.display = "block";
               break;
             case "not-available":
-              overlay.style.display = "none";
+              msg.textContent = "Already up to date.";
+              setTimeout(() => { overlay.style.display = "none"; }, 2000);
               break;
             case "error":
-              overlay.style.display = "none";
-              const btn = document.getElementById("btn-check-update");
-              btn.title = data.message || "Update check failed";
-              btn.style.borderColor = "#e53935";
-              btn.style.color = "#e53935";
+              msg.textContent = `Update error: ${data.message || "check failed"}`;
+              installBtn.style.display = "none";
+              setTimeout(() => { overlay.style.display = "none"; }, 3000);
               break;
           }
         });

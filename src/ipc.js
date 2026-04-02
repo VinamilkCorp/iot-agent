@@ -10,7 +10,11 @@ function tokensPath() {
 
 function registerIpcHandlers({ getWin, setAuthWin, getPendingAuthUrl, setPendingAuthUrl, autoUpdater, reloadScale }) {
   ipcMain.on("install-update", () => autoUpdater.quitAndInstall());
-  ipcMain.handle("check-for-updates", () => autoUpdater.checkForUpdates());
+  ipcMain.on("cancel-update", () => autoUpdater.autoDownload = false);
+  ipcMain.handle("check-for-updates", () => {
+    autoUpdater.autoDownload = true;
+    return autoUpdater.checkForUpdates();
+  });
   ipcMain.handle("reload-scale", () => reloadScale());
   ipcMain.handle("list-ports", () => listPorts());
   ipcMain.handle("list-scale-ports", () => findScalePorts());

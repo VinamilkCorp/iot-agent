@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('scale', {
   openLoginUrl:        (url) => ipcRenderer.invoke('open-login-url', url),
   onAppError:     (cb) => ipcRenderer.on('app-error', (_e, msg) => cb(msg)),
   onUpdateStatus: (cb) => ipcRenderer.on('update-status', (_e, data) => cb(data)),
+  cancelUpdate:  ()   => ipcRenderer.send('cancel-update'),
   installUpdate:  ()   => ipcRenderer.send('install-update'),
   checkForUpdates: ()  => ipcRenderer.invoke('check-for-updates'),
   saveTokens:     (tokens) => ipcRenderer.invoke('save-tokens', tokens),

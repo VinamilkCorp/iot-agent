@@ -237,7 +237,7 @@ class ScaleReader extends EventEmitter {
     this._port.on("close", () => {
       log("warn", `ScaleReader: port closed — ${this.path}`);
       this.emit("disconnected");
-      this._scheduleReconnect();
+      if (!this._disconnecting) this._scheduleReconnect();
     });
 
     this._port.on("error", (err) => {
@@ -258,6 +258,7 @@ class ScaleReader extends EventEmitter {
 
   disconnect() {
     log("info", `ScaleReader.disconnect: closing ${this.path}`);
+    this._disconnecting = true;
     clearTimeout(this._reconnectTimer);
     if (this._port?.isOpen) this._port.close();
   }

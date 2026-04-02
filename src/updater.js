@@ -1,7 +1,7 @@
 const { autoUpdater } = require("electron-updater");
 
-autoUpdater.autoDownload = true;
-autoUpdater.autoInstallOnAppQuit = true;
+autoUpdater.autoDownload = false;
+autoUpdater.autoInstallOnAppQuit = false;
 autoUpdater.forceDevUpdateConfig = false;
 
 function setupUpdater(getWin) {
@@ -24,7 +24,6 @@ function setupUpdater(getWin) {
     getWin()?.webContents.send("update-status", { status: "error", message: err.message }),
   );
 
-  autoUpdater.checkForUpdatesAndNotify();
 }
 
 module.exports = { setupUpdater, autoUpdater };
