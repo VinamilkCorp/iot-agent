@@ -18,7 +18,6 @@ const { registerIpcHandlers, tokensPath } = require("./src/ipc");
 const { setupUpdater, autoUpdater } = require("./src/updater");
 
 let win = null;
-let tray = null;
 let authWin = null;
 let pendingAuthUrl = null;
 let _reader = null;
@@ -86,6 +85,11 @@ app.whenReady().then(() => {
   startSseServer();
 
   win = createWindow(isQuitting);
+  win.on("close", async () => {
+    await _reader?.disconnect();
+    _reader = null;
+  });
+
   tray = createTray({
     getWin,
     getIsQuitting: isQuitting,
@@ -148,8 +152,8 @@ app.whenReady().then(() => {
       .catch((err) => sendError(`[autoConnect] ${err?.stack || err}`));
   }
 
-  function reloadScale() {
-    _reader?.disconnect();
+  async function reloadScale() {
+    await _reader?.disconnect();
     _reader = null;
     setScaleConnected(false);
     updateScaleState({
@@ -175,10 +179,6 @@ app.whenReady().then(() => {
   startScale();
 });
 
-app.on("before-quit", () => {
-  _reader?.disconnect();
-  _reader = null;
-});
 app.on("window-all-closed", () => {
   /* keep alive in tray */
 });
