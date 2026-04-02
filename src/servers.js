@@ -4,7 +4,7 @@ const { WebSocketServer } = require("ws");
 let sseClients = new Set();
 let wsClients = new Set();
 let scaleConnected = false;
-let scaleState = { connected: false, weight: null, unit: null, model: null, error: null, message: null, event: null };
+let scaleState = { connected: false, weight: null, unit: null, model: null, path: null, baudRate: null, error: null, message: null, event: null };
 
 function updateScaleState(patch) {
   Object.assign(scaleState, patch);
@@ -17,6 +17,7 @@ function sseEmit(event, data) {
 
   const wsMsg = JSON.stringify(payload);
   for (const ws of wsClients) if (ws.readyState === ws.OPEN) ws.send(wsMsg);
+  return payload;
 }
 
 function setScaleConnected(value) {

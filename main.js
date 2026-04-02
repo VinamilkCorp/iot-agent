@@ -110,13 +110,15 @@ app.whenReady().then(() => {
         _reader = reader;
         function emit(event, patch = {}) {
           updateScaleState({ event, ...patch });
-          sseEmit(event, patch);
-          win?.webContents.send("scale", { event, ...patch });
+          const payload = sseEmit(event, patch);
+          win?.webContents.send("scale", payload);
         }
 
         reader.on("connected", (info) => {
           setScaleConnected(true);
           updateScaleState({
+            path: info.path ?? null,
+            baudRate: info.baudRate ?? null,
             model: info.model ?? null,
             error: null,
             message: null,
@@ -129,6 +131,8 @@ app.whenReady().then(() => {
         reader.on("disconnected", () => {
           setScaleConnected(false);
           updateScaleState({
+            path: null,
+            baudRate: null,
             weight: null,
             unit: null,
             error: null,
