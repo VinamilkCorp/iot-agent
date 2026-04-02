@@ -50,8 +50,9 @@ function openWithRetry(port, retries = 3, delayMs = 1500) {
     const attempt = (n) => {
       port.open((err) => {
         if (!err) return resolve();
-        if (n <= 1 || !/SetCommState|code 31/i.test(err.message))
+        if (n <= 1 || !/SetCommState|code 31/i.test(err.message)) {
           return reject(err);
+        }
         log(
           "warn",
           `openWithRetry: SetCommState failed, retrying in ${delayMs}ms\u2026 (${n - 1} left)`,
