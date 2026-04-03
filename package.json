@@ -42,6 +42,7 @@
       ]
     },
     "win": {
+      "icon": "assets/favicon.png",
       "target": "nsis",
       "protocols": [
         {
@@ -53,6 +54,7 @@
       ]
     },
     "mac": {
+      "icon": "assets/favicon.png",
       "target": "dmg",
       "protocols": [
         {
@@ -71,6 +73,7 @@
       "preload.js",
       "renderer/**/*",
       "src/**/*",
+      "assets/favicon.png",
       "node_modules/keycloak-js/**/*"
     ],
     "extraResources": [

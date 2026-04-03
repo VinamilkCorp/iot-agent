@@ -50,7 +50,7 @@ function openWithRetry(port, retries = 5, delayMs = 1500) {
     const attempt = (n) => {
       port.open((err) => {
         if (!err) return resolve();
-        const isRetryable = /SetCommState|code 31|access denied|EACCES/i.test(
+        const isRetryable = /SetCommState|code 31|access denied|EACCES|port is not open/i.test(
           err.message,
         );
         if (n <= 1 || !isRetryable) return reject(err);
@@ -183,6 +183,11 @@ class ScaleReader extends EventEmitter {
 
   connect() {
     this._disconnecting = false;
+    if (this._port) {
+      this._port.removeAllListeners();
+      if (this._port.isOpen) this._port.close(() => {});
+      this._port = null;
+    }
     log(
       "info",
       `ScaleReader.connect: opening ${this.path} @ ${this.baudRate} baud`,

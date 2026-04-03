@@ -2,9 +2,9 @@ const { Tray, Menu, nativeImage } = require("electron");
 const path = require("path");
 const fs = require("fs");
 
-function createTray({ getWin, getIsQuitting, setIsQuitting, tokensPath, sendError, app }) {
+function createTray({ getWin, setIsQuitting, tokensPath, sendError, app }) {
   const icon = nativeImage
-    .createFromPath(path.join(__dirname, "..", "assets", "tray-icon.png"))
+    .createFromPath(path.join(__dirname, "..", "assets", "favicon.png"))
     .resize({ width: 16, height: 16 });
 
   const tray = new Tray(icon);
