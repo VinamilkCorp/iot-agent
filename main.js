@@ -165,6 +165,7 @@ app.whenReady().then(() => {
       event: "disconnected",
     });
     win?.webContents.send("scale", { event: "disconnected" });
+    await new Promise((r) => setTimeout(r, 1500));
     startScale();
   }
 
