@@ -45,9 +45,11 @@ const SERIAL_DEFAULTS = {
   hupcl: false,
 };
 
-function openWithRetry(port, retries = 5, delayMs = 1500) {
+function openWithRetry(port, retries = 5, delayMs = 1500, signal) {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(new Error("aborted"));
     const attempt = (n) => {
+      if (signal?.aborted) return reject(new Error("aborted"));
       port.open((err) => {
         if (!err) return resolve();
         const isRetryable = /SetCommState|code 31|access denied|EACCES/i.test(err.message);
@@ -63,20 +65,31 @@ function openWithRetry(port, retries = 5, delayMs = 1500) {
   });
 }
 
-function probePort(path, baudRate, timeout = 3000) {
+function probePort(path, baudRate, timeout = 3000, signal) {
   log(
     "info",
     `probePort: trying ${path} @ ${baudRate} baud (dataBits:${SERIAL_DEFAULTS.dataBits} stopBits:${SERIAL_DEFAULTS.stopBits} parity:${SERIAL_DEFAULTS.parity})`,
   );
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) return reject(new Error("aborted"));
+
     const port = new SerialPort({
       path,
       baudRate,
       ...SERIAL_DEFAULTS,
       autoOpen: false,
     });
+
+    const abort = () => {
+      clearTimeout(timer);
+      if (port.isOpen) port.close();
+      reject(new Error("aborted"));
+    };
+    signal?.addEventListener("abort", abort, { once: true });
+
     const parser = port.pipe(new ReadlineParser({ delimiter: "\r\n" }));
     const timer = setTimeout(() => {
+      signal?.removeEventListener("abort", abort);
       port.close();
       const err = new Error(
         `probePort timeout: no valid data from ${path} @ ${baudRate} baud after ${timeout}ms`,
@@ -91,6 +104,7 @@ function probePort(path, baudRate, timeout = 3000) {
         MODEL_PROFILES.reduce((acc, p) => acc || p.parse(line), null);
       if (result) {
         clearTimeout(timer);
+        signal?.removeEventListener("abort", abort);
         port.close();
         log(
           "info",
@@ -100,7 +114,7 @@ function probePort(path, baudRate, timeout = 3000) {
       }
     });
 
-    openWithRetry(port)
+    openWithRetry(port, 5, 1500, signal)
       .then(() => {
         log(
           "info",
@@ -109,6 +123,8 @@ function probePort(path, baudRate, timeout = 3000) {
       })
       .catch((err) => {
         clearTimeout(timer);
+        signal?.removeEventListener("abort", abort);
+        if (err.message === "aborted") return reject(err);
         const isCommStateErr = /SetCommState|code 31/i.test(err.message);
         log(
           isCommStateErr ? "warn" : "error",
@@ -139,13 +155,15 @@ async function detectScale(timeout = 3000) {
     `detectScale: probing ${candidates.length} port(s) × ${baudRates.length} baud rates: [${baudRates.join(", ")}]`,
   );
 
+  const ac = new AbortController();
   const probes = candidates.flatMap((c) =>
-    baudRates.map((b) => probePort(c.path, b, timeout)),
+    baudRates.map((b) => probePort(c.path, b, timeout, ac.signal)),
   );
 
   let found;
   try {
     found = await Promise.any(probes);
+    ac.abort();
   } catch {
     const err = new Error(
       `detectScale: scale not responding on any candidate port [${candidates.map((c) => c.path).join(", ")}]`,
