@@ -181,6 +181,7 @@ class ScaleReader extends EventEmitter {
 
   connect() {
     this._disconnecting = false;
+    this._opening = true;
     log(
       "info",
       `ScaleReader.connect: opening ${this.path} @ ${this.baudRate} baud`,
@@ -195,6 +196,11 @@ class ScaleReader extends EventEmitter {
 
     openWithRetry(this._port)
       .then(() => {
+        this._opening = false;
+        if (this._disconnecting) {
+          this._port.close();
+          return;
+        }
         log(
           "info",
           `ScaleReader.connect: port open — ${this.path} @ ${this.baudRate} baud`,
@@ -202,6 +208,8 @@ class ScaleReader extends EventEmitter {
         this.emit("connected", { path: this.path, baudRate: this.baudRate });
       })
       .catch((err) => {
+        this._opening = false;
+        if (this._disconnecting) return;
         const isCommStateErr = /SetCommState|code 31/i.test(err.message);
         const detail = isCommStateErr
           ? `${err.message} — Windows driver rejected settings for ${this.path}, will retry`
@@ -263,8 +271,18 @@ class ScaleReader extends EventEmitter {
     this._disconnecting = true;
     clearTimeout(this._reconnectTimer);
     return new Promise((resolve) => {
-      if (this._port?.isOpen) this._port.close(() => resolve());
-      else resolve();
+      if (this._port?.isOpen) {
+        this._port.close(() => resolve());
+      } else if (this._opening) {
+        // port is mid-open; wait for openWithRetry to finish, then it will self-close
+        const wait = () => {
+          if (!this._opening) return resolve();
+          setTimeout(wait, 100);
+        };
+        wait();
+      } else {
+        resolve();
+      }
     }).catch((reason) => {
       log("error", `Disconnecting reader from ${reason}`);
     });
