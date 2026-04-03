@@ -140,12 +140,13 @@ async function detectScale(timeout = 3000) {
   );
 
   const probes = candidates.flatMap((c) =>
-    baudRates.map((b) => probePort(c.path, b, timeout).catch(() => null)),
+    baudRates.map((b) => probePort(c.path, b, timeout)),
   );
 
-  const results = await Promise.all(probes);
-  const found = results.find(Boolean);
-  if (!found) {
+  let found;
+  try {
+    found = await Promise.any(probes);
+  } catch {
     const err = new Error(
       `detectScale: scale not responding on any candidate port [${candidates.map((c) => c.path).join(", ")}]`,
     );

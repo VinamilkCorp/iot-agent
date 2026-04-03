@@ -154,9 +154,7 @@ app.whenReady().then(() => {
   }
 
   async function reloadScale() {
-    registerExitHooks(_reader);
-
-    // await _reader?.disconnect();
+    await _reader?.disconnect();
     _reader = null;
     setScaleConnected(false);
     updateScaleState({
