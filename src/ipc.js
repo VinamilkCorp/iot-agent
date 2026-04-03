@@ -16,6 +16,7 @@ function registerIpcHandlers({ getWin, setAuthWin, getPendingAuthUrl, setPending
     return autoUpdater.checkForUpdates();
   });
   ipcMain.handle("reload-scale", () => reloadScale());
+  ipcMain.handle("reload-app", () => getWin()?.webContents.reload());
   ipcMain.handle("list-ports", () => listPorts());
   ipcMain.handle("list-scale-ports", () => findScalePorts());
   ipcMain.handle("get-env", () => ({
