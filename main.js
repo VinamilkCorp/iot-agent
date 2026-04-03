@@ -4,7 +4,7 @@ require("dotenv").config({
   path: path.join(app.isPackaged ? process.resourcesPath : __dirname, ".env"),
 });
 
-const { autoConnect, logger } = require("./src/scale");
+const { autoConnect, logger, registerExitHooks } = require("./src/scale");
 const { createWindow, askAutoStart } = require("./src/window");
 const { createTray } = require("./src/tray");
 const {
@@ -108,17 +108,11 @@ app.whenReady().then(() => {
 
   logger.on("log", (entry) => win?.webContents.send("log", entry));
 
-  let exitHooksRegistered = false;
   function startScale() {
     autoConnect()
       .then((reader) => {
         _reader = reader;
-        if (!exitHooksRegistered) {
-          exitHooksRegistered = true;
-          process.once("exit", () => _reader?.disconnect());
-          process.once("SIGINT", () => _reader?.disconnect().then(() => process.exit(0)));
-          process.once("SIGTERM", () => _reader?.disconnect().then(() => process.exit(0)));
-        }
+        registerExitHooks(_reader);
         function emit(event, patch = {}) {
           updateScaleState({ event, ...patch });
           const payload = sseEmit(event, patch);
@@ -171,7 +165,6 @@ app.whenReady().then(() => {
       event: "disconnected",
     });
     win?.webContents.send("scale", { event: "disconnected" });
-    await new Promise((r) => setTimeout(r, 1000));
     startScale();
   }
 

@@ -45,14 +45,12 @@ const SERIAL_DEFAULTS = {
   hupcl: false,
 };
 
-function openWithRetry(port, retries = 5, delayMs = 2000) {
+function openWithRetry(port, retries = 5, delayMs = 1500) {
   return new Promise((resolve, reject) => {
     const attempt = (n) => {
       port.open((err) => {
         if (!err) return resolve();
-        const isRetryable = /SetCommState|code 31|access denied|EACCES/i.test(
-          err.message,
-        );
+        const isRetryable = /SetCommState|code 31|access denied|EACCES/i.test(err.message);
         if (n <= 1 || !isRetryable) return reject(err);
         log(
           "warn",
@@ -355,9 +353,7 @@ function registerExitHooks(reader) {
   const cleanup = () => reader.disconnect();
   process.once("exit", cleanup);
   process.once("SIGINT", () => reader.disconnect().then(() => process.exit(0)));
-  process.once("SIGTERM", () =>
-    reader.disconnect().then(() => process.exit(0)),
-  );
+  process.once("SIGTERM", () => reader.disconnect().then(() => process.exit(0)));
 }
 
 module.exports = {

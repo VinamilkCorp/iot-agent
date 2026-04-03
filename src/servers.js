@@ -3,17 +3,8 @@ const { WebSocketServer } = require("ws");
 
 let sseClients = new Set();
 let wsClients = new Set();
-let scaleState = {
-  connected: false,
-  weight: null,
-  unit: null,
-  model: null,
-  path: null,
-  baudRate: null,
-  error: null,
-  message: null,
-  event: null,
-};
+let scaleConnected = false;
+let scaleState = { connected: false, weight: null, unit: null, model: null, path: null, baudRate: null, error: null, message: null, event: null };
 
 function updateScaleState(patch) {
   Object.assign(scaleState, patch);
@@ -41,10 +32,7 @@ function startSseServer() {
     const url = new URL(req.url, `http://localhost:${port}`);
 
     if (url.pathname === "/scale/status") {
-      res.writeHead(200, {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",
-      });
+      res.writeHead(200, { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" });
       res.end(JSON.stringify(scaleState));
       return;
     }
@@ -74,9 +62,7 @@ function startSseServer() {
     ws.on("close", () => wsClients.delete(ws));
   });
 
-  server.listen(port, () =>
-    console.log(`[sse] listening on http://localhost:${port}/events`),
-  );
+  server.listen(port, () => console.log(`[sse] listening on http://localhost:${port}/events`));
 }
 
 function startAuthServer({ getAuthWin, setAuthWin, getWin, sendError }) {
@@ -113,19 +99,11 @@ function startAuthServer({ getAuthWin, setAuthWin, getWin, sendError }) {
         }
       })
       .listen(port);
-    authServer.on("error", (err) =>
-      sendError(`[authServer] ${err?.stack || err}`),
-    );
+    authServer.on("error", (err) => sendError(`[authServer] ${err?.stack || err}`));
   } catch (err) {
     sendError(`[startAuthServer] ${err?.stack || err}`);
   }
   return authServer;
 }
 
-module.exports = {
-  startSseServer,
-  startAuthServer,
-  sseEmit,
-  setScaleConnected,
-  updateScaleState,
-};
+module.exports = { startSseServer, startAuthServer, sseEmit, setScaleConnected, updateScaleState };
