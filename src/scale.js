@@ -162,7 +162,7 @@ async function detectScale(timeout = 3000) {
 }
 
 class ScaleReader extends EventEmitter {
-  constructor({ path, baudRate = 9600, weightDelta = 0.1 } = {}) {
+  constructor({ path, baudRate = 9600, weightDelta = 0.01 } = {}) {
     super();
     this.path = path;
     this.baudRate = baudRate;
@@ -273,8 +273,8 @@ class ScaleReader extends EventEmitter {
     this._disconnecting = true;
     clearTimeout(this._reconnectTimer);
     return new Promise((resolve) => {
-      if (this._port?.isOpen) this._port.close(() => resolve());
-      else resolve();
+      this._port.close(() => resolve());
+      resolve();
     }).catch((reason) => {
       log("error", `Disconnecting reader from ${reason}`);
     });
