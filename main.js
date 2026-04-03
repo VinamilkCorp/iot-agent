@@ -4,7 +4,7 @@ require("dotenv").config({
   path: path.join(app.isPackaged ? process.resourcesPath : __dirname, ".env"),
 });
 
-const { autoConnect, logger } = require("./src/scale");
+const { autoConnect, logger, registerExitHooks } = require("./src/scale");
 const { createWindow, askAutoStart } = require("./src/window");
 const { createTray } = require("./src/tray");
 const {
@@ -13,7 +13,6 @@ const {
   sseEmit,
   setScaleConnected,
   updateScaleState,
-  registerExitHooks,
 } = require("./src/servers");
 const { registerIpcHandlers, tokensPath } = require("./src/ipc");
 const { setupUpdater, autoUpdater } = require("./src/updater");
