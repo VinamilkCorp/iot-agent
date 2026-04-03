@@ -87,6 +87,7 @@ app.whenReady().then(() => {
   win = createWindow(isQuitting);
   win.on("close", async () => {
     await _reader?.disconnect();
+    registerExitHooks(_reader);
     _reader = null;
   });
 
