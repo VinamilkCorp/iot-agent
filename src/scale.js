@@ -255,7 +255,15 @@ class ScaleReader extends EventEmitter {
   _scheduleReconnect(delay = 3000) {
     log("info", `ScaleReader: reconnecting in ${delay}ms…`);
     clearTimeout(this._reconnectTimer);
-    this._reconnectTimer = setTimeout(() => this.connect(), delay);
+    this._reconnectTimer = setTimeout(() => {
+      detectScale()
+        .then(({ path, baudRate }) => {
+          this.path = path;
+          this.baudRate = baudRate;
+          this.connect();
+        })
+        .catch(() => this._scheduleReconnect(delay));
+    }, delay);
   }
 
   disconnect() {
