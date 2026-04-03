@@ -45,17 +45,16 @@ const SERIAL_DEFAULTS = {
   hupcl: false,
 };
 
-function openWithRetry(port, retries = 3, delayMs = 1500) {
+function openWithRetry(port, retries = 5, delayMs = 1500) {
   return new Promise((resolve, reject) => {
     const attempt = (n) => {
       port.open((err) => {
         if (!err) return resolve();
-        if (n <= 1 || !/SetCommState|code 31/i.test(err.message)) {
-          return reject(err);
-        }
+        const isRetryable = /SetCommState|code 31|access denied|EACCES/i.test(err.message);
+        if (n <= 1 || !isRetryable) return reject(err);
         log(
           "warn",
-          `openWithRetry: SetCommState failed, retrying in ${delayMs}ms\u2026 (${n - 1} left)`,
+          `openWithRetry: ${err.message} — retrying in ${delayMs}ms… (${n - 1} left)`,
         );
         setTimeout(() => attempt(n - 1), delayMs);
       });
@@ -181,6 +180,7 @@ class ScaleReader extends EventEmitter {
   }
 
   connect() {
+    this._disconnecting = false;
     log(
       "info",
       `ScaleReader.connect: opening ${this.path} @ ${this.baudRate} baud`,
@@ -206,6 +206,7 @@ class ScaleReader extends EventEmitter {
         const detail = isCommStateErr
           ? `${err.message} — Windows driver rejected settings for ${this.path}, will retry`
           : `${err.message} (code:${err.cause?.errno ?? err.errno ?? "?"})`;
+
         log(
           isCommStateErr ? "warn" : "error",
           `ScaleReader.connect: failed to open ${this.path} — ${detail}`,
@@ -264,6 +265,8 @@ class ScaleReader extends EventEmitter {
     return new Promise((resolve) => {
       if (this._port?.isOpen) this._port.close(() => resolve());
       else resolve();
+    }).catch((reason) => {
+      log("error", `Disconnecting reader from ${reason}`);
     });
   }
 }
@@ -346,6 +349,13 @@ async function autoConnect(options = {}) {
   });
 }
 
+function registerExitHooks(reader) {
+  const cleanup = () => reader.disconnect();
+  process.once("exit", cleanup);
+  process.once("SIGINT", () => reader.disconnect().then(() => process.exit(0)));
+  process.once("SIGTERM", () => reader.disconnect().then(() => process.exit(0)));
+}
+
 module.exports = {
   listPorts,
   findScalePorts,
@@ -354,5 +364,6 @@ module.exports = {
   ScaleReader,
   ScaleWatcher,
   autoConnect,
+  registerExitHooks,
   logger,
 };

@@ -13,6 +13,7 @@ const {
   sseEmit,
   setScaleConnected,
   updateScaleState,
+  registerExitHooks,
 } = require("./src/servers");
 const { registerIpcHandlers, tokensPath } = require("./src/ipc");
 const { setupUpdater, autoUpdater } = require("./src/updater");
@@ -112,6 +113,7 @@ app.whenReady().then(() => {
     autoConnect()
       .then((reader) => {
         _reader = reader;
+        registerExitHooks(_reader);
         function emit(event, patch = {}) {
           updateScaleState({ event, ...patch });
           const payload = sseEmit(event, patch);
