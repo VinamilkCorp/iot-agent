@@ -55,9 +55,11 @@ async function getAccessToken() {
 
 window.auth = { getAccessToken };
 
-const loginScreen = document.getElementById("login-screen");
-const loginStatus = document.getElementById("login-status");
-const loginError = document.getElementById("login-error");
+const loginScreen  = document.getElementById("login-screen");
+const loginStatus  = document.getElementById("login-status");
+const loginError   = document.getElementById("login-error");
+const loginSpinner = document.getElementById("login-spinner");
+const loginBtn     = document.getElementById("btn-login");
 
 const log = {
   info: (msg) => console.log(`[auth] ${msg}`),
@@ -65,9 +67,19 @@ const log = {
   error: (msg) => console.error(`[auth] ${msg}`),
 };
 
+function setLoading(text) {
+  loginBtn.disabled = true;
+  loginSpinner.style.display = "block";
+  loginStatus.style.display = text ? "block" : "none";
+  loginStatus.textContent = text ?? "";
+  loginError.style.display = "none";
+}
+
 function showError(msg) {
   const text = msg instanceof Error ? msg.message : String(msg);
   log.error(text);
+  loginBtn.disabled = false;
+  loginSpinner.style.display = "none";
   loginStatus.style.display = "none";
   loginError.style.display = "block";
   loginError.textContent = text;
@@ -148,9 +160,9 @@ async function startLoginFlow(env) {
       state,
       nonce,
     });
-  loginStatus.textContent = "Opening browser for login…";
+  setLoading("Đang mở trình duyệt để đăng nhập…");
   await window.scale.openLoginUrl(loginUrl);
-  loginStatus.textContent = "Waiting for login in browser…";
+  setLoading("Đang chờ đăng nhập trên trình duyệt…");
   const callbackParams = await waitForCallback();
   await window.scale.reloadWithCallback(callbackParams);
 }
@@ -168,6 +180,11 @@ async function initAuth() {
     log.warn("auth env vars missing and AUTH_REQUIRED=false — skipping authentication");
     return onLoginSuccess();
   }
+
+  // expose login trigger for the home page button
+  window.auth.startLogin = async () => {
+    try { await startLoginFlow(_env); } catch (err) { showError(err); }
+  };
 
   const storedCallback = sessionStorage.getItem("kcCallback");
   if (storedCallback) {
@@ -193,7 +210,7 @@ async function initAuth() {
   if (stored?.refresh_token) {
     if (!isTokenExpired(stored.refresh_token)) {
       log.info("stored refresh token is valid — attempting silent refresh");
-      loginStatus.textContent = "Resuming session…";
+      setLoading("Đang tiếp tục phiên làm việc…");
       try {
         const tokens = await refreshTokens(_env, stored.refresh_token);
         currentTokens = tokens;
@@ -215,12 +232,8 @@ async function initAuth() {
     }
   }
 
-  log.info("no valid session — starting login flow");
-  try {
-    await startLoginFlow(_env);
-  } catch (err) {
-    showError(err);
-  }
+  log.info("no valid session — showing login button");
+  // home page is already visible; user clicks Login to proceed
 }
 
 initAuth();
