@@ -1,6 +1,6 @@
 const { contextBridge, ipcRenderer, app } = require("electron");
 
-const version = app?.getVersion() ?? "";
+const version = app?.getVersion() ?? "1.0.0";
 
 contextBridge.exposeInMainWorld("scale", {
   version,
@@ -10,7 +10,7 @@ contextBridge.exposeInMainWorld("scale", {
   listScalePorts: () => ipcRenderer.invoke("list-scale-ports"),
   getEnv: () => ipcRenderer.invoke("get-env"),
   onAuthCallback: (cb) => ipcRenderer.on("auth-callback", (_e, url) => cb(url)),
-  reloadScale: () => ipcRenderer.invoke("reload-scale"),
+  reloadApp: () => ipcRenderer.invoke("reload-app"),
   reloadWithCallback: (fragment) =>
     ipcRenderer.invoke("reload-with-callback", fragment),
   getPendingAuthUrl: () => ipcRenderer.invoke("get-pending-auth-url"),

@@ -45,17 +45,18 @@ const SERIAL_DEFAULTS = {
   hupcl: false,
 };
 
-function openWithRetry(port, retries = 3, delayMs = 1500) {
+function openWithRetry(port, retries = 5, delayMs = 1500) {
   return new Promise((resolve, reject) => {
     const attempt = (n) => {
       port.open((err) => {
         if (!err) return resolve();
-        if (n <= 1 || !/SetCommState|code 31/i.test(err.message)) {
-          return reject(err);
-        }
+        const isRetryable = /SetCommState|code 31|access denied|EACCES|port is not open/i.test(
+          err.message,
+        );
+        if (n <= 1 || !isRetryable) return reject(err);
         log(
           "warn",
-          `openWithRetry: SetCommState failed, retrying in ${delayMs}ms\u2026 (${n - 1} left)`,
+          `openWithRetry: ${err.message} — retrying in ${delayMs}ms… (${n - 1} left)`,
         );
         setTimeout(() => attempt(n - 1), delayMs);
       });
@@ -161,7 +162,7 @@ async function detectScale(timeout = 3000) {
 }
 
 class ScaleReader extends EventEmitter {
-  constructor({ path, baudRate = 9600, weightDelta = 0.1 } = {}) {
+  constructor({ path, baudRate = 9600, weightDelta = 0.01 } = {}) {
     super();
     this.path = path;
     this.baudRate = baudRate;
@@ -181,6 +182,12 @@ class ScaleReader extends EventEmitter {
   }
 
   connect() {
+    this._disconnecting = false;
+    if (this._port) {
+      this._port.removeAllListeners();
+      if (this._port.isOpen) this._port.close(() => {});
+      this._port = null;
+    }
     log(
       "info",
       `ScaleReader.connect: opening ${this.path} @ ${this.baudRate} baud`,
@@ -206,6 +213,7 @@ class ScaleReader extends EventEmitter {
         const detail = isCommStateErr
           ? `${err.message} — Windows driver rejected settings for ${this.path}, will retry`
           : `${err.message} (code:${err.cause?.errno ?? err.errno ?? "?"})`;
+
         log(
           isCommStateErr ? "warn" : "error",
           `ScaleReader.connect: failed to open ${this.path} — ${detail}`,
@@ -254,14 +262,27 @@ class ScaleReader extends EventEmitter {
   _scheduleReconnect(delay = 3000) {
     log("info", `ScaleReader: reconnecting in ${delay}ms…`);
     clearTimeout(this._reconnectTimer);
-    this._reconnectTimer = setTimeout(() => this.connect(), delay);
+    this._reconnectTimer = setTimeout(() => {
+      detectScale()
+        .then(({ path, baudRate }) => {
+          this.path = path;
+          this.baudRate = baudRate;
+          this.connect();
+        })
+        .catch(() => this._scheduleReconnect(delay));
+    }, delay);
   }
 
   disconnect() {
     log("info", `ScaleReader.disconnect: closing ${this.path}`);
     this._disconnecting = true;
     clearTimeout(this._reconnectTimer);
-    if (this._port?.isOpen) this._port.close();
+    return new Promise((resolve) => {
+      this._port.close(() => resolve());
+      resolve();
+    }).catch((reason) => {
+      log("error", `Disconnecting reader from ${reason}`);
+    });
   }
 }
 
@@ -343,6 +364,15 @@ async function autoConnect(options = {}) {
   });
 }
 
+function registerExitHooks(reader) {
+  const cleanup = () => reader.disconnect();
+  process.once("exit", cleanup);
+  process.once("SIGINT", () => reader.disconnect().then(() => process.exit(0)));
+  process.once("SIGTERM", () =>
+    reader.disconnect().then(() => process.exit(0)),
+  );
+}
+
 module.exports = {
   listPorts,
   findScalePorts,
@@ -351,5 +381,6 @@ module.exports = {
   ScaleReader,
   ScaleWatcher,
   autoConnect,
+  registerExitHooks,
   logger,
 };

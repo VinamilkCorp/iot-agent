@@ -14,6 +14,7 @@ function createWindow(isQuitting) {
     width: 1100,
     height: 700,
     title: "IoT Scale",
+    icon: path.join(__dirname, "..", "assets", "favicon.png"),
     show: false,
     webPreferences: {
       preload: path.join(__dirname, "..", "preload.js"),
@@ -28,7 +29,6 @@ function createWindow(isQuitting) {
     win.loadFile("renderer/index.html");
   }
 
-  win.once("ready-to-show", () => win.show());
   win.on("close", (e) => {
     if (isQuitting()) return;
     e.preventDefault();

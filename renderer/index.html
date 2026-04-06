@@ -1,82 +1,233 @@
 <!doctype html>
-<html lang="en">
+<html lang="vi">
   <head>
     <meta charset="UTF-8" />
-    <title>IoT Scale</title>
+    <title>Cân Điện Tử</title>
     <style>
+      /* ── Theme tokens ── */
+      :root {
+        --bg: #f5f5f5;
+        --bg-2: #ececec;
+        --bg-3: #e4e4e4;
+        --border: #d4d4d4;
+        --border-2: #c8c8c8;
+        --text: #1a1a1a;
+        --text-2: #555;
+        --text-3: #999;
+        --btn-bg: #fff;
+        --btn-border: #d0d0d0;
+        --btn-color: #555;
+        --btn-hover-bg: #f0f0f0;
+        --panel-bg: #fff;
+        --panel-title: #f5f5f5;
+        --row-hover: #f9f9f9;
+        --scrollbar: #d0d0d0;
+        --overlay-bg: rgba(245, 245, 245, 0.96);
+        --login-bg: #f5f5f5;
+        --login-sub: #aaa;
+        --spinner-track: #e0e0e0;
+        --empty: #bbb;
+        --th-color: #999;
+        --scale-val: #111;
+        --scale-shadow: rgba(76, 175, 80, 0.15);
+        --accent: #2e7d32;
+        --accent-light: #4caf50;
+        --warn: #e65100;
+        --error: #c62828;
+      }
+      html.dark {
+        --bg: #0a0a0a;
+        --bg-2: #0f0f0f;
+        --bg-3: #111;
+        --border: #1a1a1a;
+        --border-2: #2a2a2a;
+        --text: #ccc;
+        --text-2: #666;
+        --text-3: #444;
+        --btn-bg: #161616;
+        --btn-border: #2a2a2a;
+        --btn-color: #777;
+        --btn-hover-bg: #1e1e1e;
+        --panel-bg: #0a0a0a;
+        --panel-title: #0f0f0f;
+        --row-hover: #111;
+        --scrollbar: #222;
+        --overlay-bg: rgba(10, 10, 10, 0.96);
+        --login-bg: #0a0a0a;
+        --login-sub: #3a3a3a;
+        --spinner-track: #1e1e1e;
+        --empty: #333;
+        --th-color: #444;
+        --scale-val: #fff;
+        --scale-shadow: rgba(76, 175, 80, 0.25);
+        --accent: #4caf50;
+        --accent-light: #66bb6a;
+        --warn: #f0a500;
+        --error: #e53935;
+      }
+
       * {
         box-sizing: border-box;
         margin: 0;
         padding: 0;
       }
+
       body {
         font-family: monospace;
-        background: #0d0d0d;
-        color: #ccc;
+        background: var(--bg);
+        color: var(--text);
         display: flex;
         flex-direction: column;
         height: 100vh;
+        transition:
+          background 0.2s,
+          color 0.2s;
       }
 
+      /* ── Header ── */
       header {
         padding: 10px 20px;
-        background: #161616;
-        border-bottom: 1px solid #222;
+        background: var(--bg-3);
+        border-bottom: 1px solid var(--border);
         display: flex;
         align-items: center;
+        gap: 8px;
       }
       header h1 {
-        font-size: 1rem;
-        color: #fff;
+        font-size: 0.95rem;
+        color: var(--text);
         flex: 1;
-      }
-
-      #scale-bar {
-        padding: 8px 20px;
-        background: #111;
-        border-bottom: 1px solid #1e1e1e;
+        letter-spacing: 0.03em;
         display: flex;
         align-items: center;
-        gap: 24px;
-        font-size: 0.8rem;
+        gap: 8px;
       }
-      .scale-val {
-        font-size: 1.6rem;
-        font-weight: 700;
-        color: #fff;
+      .h1-logo {
+        width: 18px;
+        height: 18px;
+        object-fit: contain;
+        flex-shrink: 0;
       }
-      .scale-unit {
-        font-size: 0.9rem;
-        color: #888;
-        margin-left: 4px;
-      }
-      #scale-meta {
-        color: #555;
+      header h1 .version {
+        font-size: 0.68rem;
+        color: var(--text-3);
+        font-weight: normal;
+        margin-left: 6px;
       }
 
+      /* ── Buttons (shared) ── */
+      .btn {
+        background: var(--btn-bg);
+        border: 1px solid var(--btn-border);
+        color: var(--btn-color);
+        padding: 4px 12px;
+        cursor: pointer;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 0.72rem;
+        transition:
+          color 0.15s,
+          border-color 0.15s,
+          background 0.15s;
+      }
+      .btn:hover {
+        color: var(--text);
+        border-color: var(--border-2);
+        background: var(--btn-hover-bg);
+      }
+      .btn.danger:hover {
+        color: var(--error);
+        border-color: var(--error);
+      }
+      .btn.primary {
+        color: var(--accent);
+        border-color: var(--accent);
+      }
+      .btn.primary:hover {
+        background: var(--row-hover);
+      }
+
+      /* ── Theme toggle ── */
+      #btn-theme {
+        background: var(--btn-bg);
+        border: 1px solid var(--btn-border);
+        color: var(--btn-color);
+        width: 28px;
+        height: 28px;
+        cursor: pointer;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition:
+          background 0.15s,
+          border-color 0.15s;
+        flex-shrink: 0;
+      }
+      #btn-theme:hover {
+        background: var(--btn-hover-bg);
+        border-color: var(--border-2);
+      }
+
+      /* ── Scale bar ── */
+      #scale-bar {
+        padding: 10px 20px;
+        background: var(--bg-2);
+        border-bottom: 1px solid var(--border);
+        display: flex;
+        align-items: center;
+        gap: 28px;
+      }
+      #scale-bar .status-group {
+        display: flex;
+        align-items: center;
+      }
+      .scale-val {
+        font-size: 2rem;
+        font-weight: 700;
+        color: var(--scale-val);
+        letter-spacing: -0.02em;
+        text-shadow: 0 0 20px var(--scale-shadow);
+      }
+      .scale-unit {
+        font-size: 0.85rem;
+        color: var(--text-2);
+        margin-left: 5px;
+      }
+      #scale-meta {
+        color: var(--text-3);
+        font-size: 0.72rem;
+        margin-left: auto;
+      }
+
+      /* ── Nav ── */
       nav {
         display: flex;
-        background: #111;
-        border-bottom: 1px solid #222;
+        background: var(--bg-2);
+        border-bottom: 1px solid var(--border);
       }
       nav button {
         background: none;
         border: none;
-        color: #666;
-        padding: 8px 20px;
-        font-size: 0.8rem;
+        color: var(--text-2);
+        padding: 8px 22px;
+        font-size: 0.75rem;
         cursor: pointer;
         border-bottom: 2px solid transparent;
         font-family: monospace;
+        transition: color 0.15s;
+        letter-spacing: 0.04em;
       }
       nav button:hover {
-        color: #ccc;
+        color: var(--text);
       }
       nav button.active {
-        color: #fff;
-        border-bottom-color: #4caf50;
+        color: var(--text);
+        border-bottom-color: var(--accent);
       }
 
+      /* ── Tabs ── */
       .tab {
         display: none;
         flex: 1;
@@ -87,216 +238,339 @@
         display: flex;
       }
 
+      /* ── Grid / Panels ── */
       .grid {
         display: grid;
         grid-template-columns: 1fr 1fr;
         gap: 1px;
-        background: #222;
+        background: var(--border);
         flex: 1;
         overflow: hidden;
       }
       .panel {
-        background: #0d0d0d;
+        background: var(--panel-bg);
         display: flex;
         flex-direction: column;
         overflow: hidden;
       }
       .panel-title {
-        padding: 6px 14px;
-        font-size: 0.72rem;
-        color: #555;
-        background: #111;
-        border-bottom: 1px solid #1e1e1e;
+        padding: 7px 14px;
+        font-size: 0.68rem;
+        color: var(--th-color);
+        background: var(--panel-title);
+        border-bottom: 1px solid var(--border);
         display: flex;
         justify-content: space-between;
         align-items: center;
+        letter-spacing: 0.08em;
       }
       .panel-title button {
-        font-size: 0.7rem;
-        background: #1e1e1e;
-        border: 1px solid #333;
-        color: #888;
+        font-size: 0.68rem;
+        background: var(--btn-bg);
+        border: 1px solid var(--btn-border);
+        color: var(--btn-color);
         padding: 2px 8px;
         cursor: pointer;
-        border-radius: 4px;
+        border-radius: 3px;
+        font-family: monospace;
+        transition:
+          color 0.15s,
+          border-color 0.15s;
       }
       .panel-title button:hover {
-        color: #fff;
+        color: var(--text);
+        border-color: var(--border-2);
       }
       .panel-body {
         flex: 1;
         overflow-y: auto;
         padding: 10px 14px;
-        font-size: 0.78rem;
-        line-height: 1.6;
+        font-size: 0.76rem;
+        line-height: 1.7;
+      }
+      .panel-body::-webkit-scrollbar {
+        width: 4px;
+      }
+      .panel-body::-webkit-scrollbar-track {
+        background: transparent;
+      }
+      .panel-body::-webkit-scrollbar-thumb {
+        background: var(--scrollbar);
+        border-radius: 2px;
       }
 
+      /* ── Log ── */
       .log-line {
         white-space: pre-wrap;
         word-break: break-all;
       }
       .log-line.info {
-        color: #ccc;
+        color: var(--text-2);
       }
       .log-line.warn {
-        color: #f0a500;
+        color: var(--warn);
       }
       .log-line.error {
-        color: #e53935;
+        color: var(--error);
       }
       .log-line.weight {
-        color: #4caf50;
+        color: var(--accent);
       }
 
+      /* ── Table ── */
       table {
         width: 100%;
         border-collapse: collapse;
-        font-size: 0.75rem;
+        font-size: 0.73rem;
       }
       th {
         text-align: left;
-        color: #555;
-        padding: 4px 8px;
-        border-bottom: 1px solid #1e1e1e;
+        color: var(--th-color);
+        padding: 5px 8px;
+        border-bottom: 1px solid var(--border);
+        letter-spacing: 0.05em;
       }
       td {
-        padding: 4px 8px;
-        border-bottom: 1px solid #111;
+        padding: 5px 8px;
+        border-bottom: 1px solid var(--border);
+        transition: background 0.1s;
+      }
+      tr:hover td {
+        background: var(--row-hover);
       }
       td.scale-port {
-        color: #4caf50;
+        color: var(--accent);
       }
       .empty {
-        color: #444;
+        color: var(--empty);
         font-style: italic;
       }
 
+      /* ── Dot indicator ── */
       .dot {
         display: inline-block;
-        width: 8px;
-        height: 8px;
+        width: 7px;
+        height: 7px;
         border-radius: 50%;
-        margin-right: 6px;
+        margin-right: 7px;
+        flex-shrink: 0;
       }
       .dot.green {
         background: #4caf50;
+        box-shadow: 0 0 6px #4caf5088;
       }
       .dot.yellow {
         background: #f0a500;
+        box-shadow: 0 0 6px #f0a50066;
       }
       .dot.red {
         background: #e53935;
+        box-shadow: 0 0 6px #e5393566;
       }
       .dot.grey {
-        background: #555;
+        background: var(--border-2);
       }
 
+      /* ── Login / Home screen ── */
       #login-screen {
         position: fixed;
         inset: 0;
-        background: #0d0d0d;
+        background: var(--login-bg);
         display: flex;
         flex-direction: column;
         align-items: center;
         justify-content: center;
         z-index: 999;
-        gap: 16px;
+        gap: 0;
+        transition: background 0.2s;
       }
-      #login-screen h2 {
+      .home-logo {
+        width: 72px;
+        height: 72px;
+        margin-bottom: 20px;
+        opacity: 0.92;
+        filter: drop-shadow(0 0 18px rgba(76, 175, 80, 0.35));
+      }
+      .home-title {
+        color: var(--text);
+        font-size: 1.15rem;
+        letter-spacing: 0.06em;
+        margin-bottom: 6px;
+      }
+      .home-subtitle {
+        color: var(--login-sub);
+        font-size: 0.72rem;
+        letter-spacing: 0.04em;
+        margin-bottom: 32px;
+      }
+      #btn-login {
+        background: var(--accent);
+        border: none;
         color: #fff;
-        font-size: 1.1rem;
+        padding: 9px 32px;
+        cursor: pointer;
+        border-radius: 4px;
+        font-family: monospace;
+        font-size: 0.82rem;
+        font-weight: 700;
+        letter-spacing: 0.05em;
+        transition:
+          background 0.15s,
+          box-shadow 0.15s;
+        box-shadow: 0 0 16px rgba(76, 175, 80, 0.2);
       }
-      #login-screen p {
-        color: #555;
-        font-size: 0.8rem;
+      #btn-login:hover {
+        background: var(--accent-light);
+        box-shadow: 0 0 24px rgba(76, 175, 80, 0.35);
       }
-      #login-screen .dot-spin {
-        width: 10px;
-        height: 10px;
-        border-radius: 50%;
-        background: #4caf50;
-        animation: pulse 1s infinite;
+      #btn-login:disabled {
+        background: var(--border-2);
+        color: var(--text-3);
+        cursor: default;
+        box-shadow: none;
       }
-      @keyframes pulse {
-        0%,
-        100% {
-          opacity: 1;
-        }
-        50% {
-          opacity: 0.2;
-        }
+
+      /* theme toggle on login screen */
+      #login-theme-btn {
+        position: absolute;
+        top: 16px;
+        right: 16px;
+        background: var(--btn-bg);
+        border: 1px solid var(--btn-border);
+        color: var(--btn-color);
+        width: 28px;
+        height: 28px;
+        cursor: pointer;
+        border-radius: 4px;
+        font-size: 0.85rem;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: background 0.15s;
+      }
+      #login-theme-btn:hover {
+        background: var(--btn-hover-bg);
+      }
+
+      .login-status-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-top: 24px;
+        min-height: 28px;
+      }
+      #login-status {
+        color: var(--text-3);
+        font-size: 0.75rem;
+        display: none;
       }
       #login-error {
-        color: #e53935;
-        font-size: 0.8rem;
+        color: var(--error);
+        font-size: 0.75rem;
         display: none;
+      }
+
+      .spinner {
+        width: 16px;
+        height: 16px;
+        border: 2px solid var(--spinner-track);
+        border-top-color: var(--accent);
+        border-radius: 50%;
+        animation: spin 0.8s linear infinite;
+        display: none;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* ── Update overlay ── */
+      #update-overlay {
+        display: none;
+        position: fixed;
+        inset: 0;
+        background: var(--overlay-bg);
+        backdrop-filter: blur(4px);
+        z-index: 1000;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 16px;
+        color: var(--text);
+      }
+      #update-overlay h2 {
+        font-size: 1.05rem;
+        letter-spacing: 0.05em;
+      }
+      #update-msg {
+        font-size: 0.82rem;
+        color: var(--text-2);
+      }
+      #update-bar-wrap {
+        display: none;
+        width: 280px;
+        background: var(--border);
+        border-radius: 4px;
+        overflow: hidden;
+        height: 4px;
+      }
+      #update-bar {
+        height: 100%;
+        width: 0%;
+        background: linear-gradient(90deg, #2e7d32, #4caf50);
+        transition: width 0.3s;
+        box-shadow: 0 0 8px #4caf5066;
       }
     </style>
   </head>
   <body>
     <div id="login-screen">
-      <h2>⚖ IoT Scale</h2>
-      <div class="dot-spin"></div>
-      <p id="login-status">Connecting to authentication server…</p>
-      <p id="login-error"></p>
+      <button
+        id="login-theme-btn"
+        onclick="toggleTheme()"
+        title="Đổi giao diện"
+      >
+        🌙
+      </button>
+      <img class="home-logo" src="../assets/favicon.png" alt="Cân Điện Tử" />
+      <h2 class="home-title">Cân Điện Tử</h2>
+      <p class="home-subtitle">BẢNG ĐIỀU KHIỂN</p>
+      <button id="btn-login" onclick="window.auth.startLogin()">
+        Đăng nhập
+      </button>
+      <div class="login-status-row">
+        <div class="spinner" id="login-spinner"></div>
+        <p id="login-status"></p>
+        <p id="login-error"></p>
+      </div>
     </div>
 
     <header>
-      <h1>⚖ IoT Scale Dashboard <span id="app-version" style="font-size: 0.7rem; color: #555; font-weight: normal;"></span></h1>
-      <button
-        onclick="window.scale.reloadScale().then(() => { loadPorts(); loadScalePorts(); })"
-        style="
-          background: #1e1e1e;
-          border: 1px solid #333;
-          color: #888;
-          padding: 4px 12px;
-          cursor: pointer;
-          border-radius: 4px;
-          font-family: monospace;
-          font-size: 0.75rem;
-          margin-right: 6px;
-        "
-      >
-        ↺ Reload
+      <h1>
+        <img class="h1-logo" src="../assets/favicon.png" alt="" /> Bảng Điều
+        Khiển Cân Điện Tử <span class="version" id="app-version"></span>
+      </h1>
+      <button class="btn" onclick="window.scale.reloadApp()">↺ Tải lại</button>
+      <button class="btn" onclick="window.scale.checkForUpdates()">
+        Kiểm tra cập nhật
       </button>
       <button
-        onclick="window.scale.checkForUpdates()"
-        style="
-          background: #1e1e1e;
-          border: 1px solid #333;
-          color: #888;
-          padding: 4px 12px;
-          cursor: pointer;
-          border-radius: 4px;
-          font-family: monospace;
-          font-size: 0.75rem;
-          margin-right: 6px;
-        "
-      >
-        Check update
-      </button>
-      <button
+        class="btn danger"
         id="btn-signout"
         onclick="window.scale.signOut()"
-        style="
-          background: #1e1e1e;
-          border: 1px solid #333;
-          color: #888;
-          padding: 4px 12px;
-          cursor: pointer;
-          border-radius: 4px;
-          font-family: monospace;
-          font-size: 0.75rem;
-        "
       >
-        Sign out
+        Đăng xuất
+      </button>
+      <button id="btn-theme" onclick="toggleTheme()" title="Đổi giao diện">
+        🌙
       </button>
     </header>
 
     <div id="scale-bar">
-      <div>
+      <div class="status-group">
         <span class="dot yellow" id="scale-dot"></span>
-        <span id="scale-status-text">Waiting for scale…</span>
+        <span id="scale-status-text">Đang chờ cân…</span>
       </div>
       <div>
         <span class="scale-val" id="weight-val">—</span>
@@ -306,28 +580,28 @@
     </div>
 
     <nav>
-      <button class="active" onclick="showTab('overview')">Overview</button>
-      <button onclick="showTab('log')">Log</button>
+      <button class="active" onclick="showTab('overview')">Tổng quan</button>
+      <button onclick="showTab('log')">Nhật ký</button>
     </nav>
 
     <div class="tab active" id="tab-overview">
       <div class="grid">
         <div class="panel">
           <div class="panel-title">
-            <span>ALL PORTS</span
-            ><button onclick="loadPorts()">↻ Refresh</button>
+            <span>TẤT CẢ CỔNG</span>
+            <button onclick="loadPorts()">↻ Làm mới</button>
           </div>
           <div class="panel-body" id="ports-body">
-            <span class="empty">Loading…</span>
+            <span class="empty">Đang tải…</span>
           </div>
         </div>
         <div class="panel">
           <div class="panel-title">
-            <span>SCALE PORTS</span
-            ><button onclick="loadScalePorts()">↻ Refresh</button>
+            <span>CỔNG CÂN</span>
+            <button onclick="loadScalePorts()">↻ Làm mới</button>
           </div>
           <div class="panel-body" id="scale-ports-body">
-            <span class="empty">Loading…</span>
+            <span class="empty">Đang tải…</span>
           </div>
         </div>
       </div>
@@ -336,91 +610,72 @@
     <div class="tab" id="tab-log">
       <div class="panel" style="flex: 1">
         <div class="panel-title">
-          <span>LOG</span
-          ><span style="display: flex; gap: 6px"
-            ><button id="btn-pause-log" onclick="toggleLog()">⏸ Pause</button
-            ><button onclick="clearLog()">Clear</button></span
-          >
+          <span>LOG</span>
+          <span style="display: flex; gap: 6px">
+            <button id="btn-pause-log" onclick="toggleLog()">⏸ Tạm dừng</button>
+            <button onclick="clearLog()">Xóa</button>
+          </span>
         </div>
         <div class="panel-body" id="log-body"></div>
       </div>
     </div>
 
     <!-- Update overlay -->
-    <div
-      id="update-overlay"
-      style="
-        display: none;
-        position: fixed;
-        inset: 0;
-        background: #0d0d0d;
-        z-index: 1000;
-        display: none;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        gap: 14px;
-        font-family: monospace;
-        color: #ccc;
-      "
-    >
-      <h2 style="color: #fff; font-size: 1.1rem">⚖ IoT Scale</h2>
-      <p id="update-msg" style="font-size: 0.85rem; color: #888"></p>
-      <div
-        id="update-bar-wrap"
-        style="
-          display: none;
-          width: 260px;
-          background: #1e1e1e;
-          border-radius: 4px;
-          overflow: hidden;
-          height: 6px;
-        "
-      >
-        <div
-          id="update-bar"
+    <div id="update-overlay">
+      <h2>
+        <img
+          src="../assets/favicon.png"
           style="
-            height: 100%;
-            width: 0%;
-            background: #4caf50;
-            transition: width 0.3s;
+            width: 20px;
+            height: 20px;
+            vertical-align: middle;
+            margin-right: 8px;
           "
-        ></div>
-      </div>
+          alt=""
+        />Cân Điện Tử
+      </h2>
+      <p id="update-msg"></p>
+      <div id="update-bar-wrap"><div id="update-bar"></div></div>
       <button
+        class="btn primary"
         id="update-install-btn"
+        style="display: none"
         onclick="window.scale.installUpdate()"
-        style="
-          display: none;
-          background: #1e1e1e;
-          border: 1px solid #333;
-          color: #4caf50;
-          padding: 6px 18px;
-          cursor: pointer;
-          border-radius: 4px;
-          font-family: monospace;
-          font-size: 0.85rem;
-        "
       >
-        Restart &amp; Install
+        Khởi động lại &amp; Cài đặt
       </button>
       <button
+        class="btn"
         id="update-cancel-btn"
-        onclick="window.scale.cancelUpdate(); document.getElementById('update-overlay').style.display='none';"
-        style="
-          background: #1e1e1e;
-          border: 1px solid #333;
-          color: #888;
-          padding: 6px 18px;
-          cursor: pointer;
-          border-radius: 4px;
-          font-family: monospace;
-          font-size: 0.85rem;
+        onclick="
+          window.scale.cancelUpdate();
+          document.getElementById('update-overlay').style.display = 'none';
         "
       >
-        Cancel
+        Hủy
       </button>
     </div>
+
+    <script>
+      // ── Theme ──
+      const ICONS = { dark: "☀️", light: "🌙" };
+      function applyTheme(mode) {
+        document.documentElement.classList.toggle("dark", mode === "dark");
+        document
+          .querySelectorAll("#btn-theme, #login-theme-btn")
+          .forEach((b) => (b.textContent = ICONS[mode]));
+        localStorage.setItem("theme", mode);
+      }
+      function toggleTheme() {
+        applyTheme(
+          document.documentElement.classList.contains("dark")
+            ? "light"
+            : "dark",
+        );
+      }
+      // default: light
+      applyTheme(localStorage.getItem("theme") || "light");
+    </script>
 
     <script>
       (function () {
@@ -434,38 +689,45 @@
           switch (data.status) {
             case "checking":
               overlay.style.display = "flex";
-              msg.textContent = "Checking for updates…";
+              msg.textContent = "Đang kiểm tra cập nhật…";
               break;
             case "available":
-              msg.textContent = `Update v${data.version} found — downloading…`;
+              msg.textContent = `Tìm thấy bản cập nhật v${data.version} — đang tải…`;
               barWrap.style.display = "block";
               break;
             case "downloading":
               overlay.style.display = "flex";
               barWrap.style.display = "block";
               bar.style.width = data.percent + "%";
-              msg.textContent = `Downloading update… ${data.percent}%`;
+              msg.textContent = `Đang tải bản cập nhật… ${data.percent}%`;
               break;
             case "downloaded":
               bar.style.width = "100%";
-              msg.textContent = `v${data.version} ready to install.`;
+              msg.textContent = `v${data.version} sẵn sàng cài đặt.`;
               installBtn.style.display = "block";
               break;
             case "not-available":
-              msg.textContent = "Already up to date.";
-              setTimeout(() => { overlay.style.display = "none"; }, 2000);
+              msg.textContent = "Ứng dụng đã là phiên bản mới nhất.";
+              setTimeout(() => {
+                overlay.style.display = "none";
+              }, 2000);
               break;
             case "error":
-              msg.textContent = `Update error: ${data.message || "check failed"}`;
+              msg.textContent = `Lỗi cập nhật: ${data.message || "kiểm tra thất bại"}`;
               installBtn.style.display = "none";
-              setTimeout(() => { overlay.style.display = "none"; }, 3000);
+              setTimeout(() => {
+                overlay.style.display = "none";
+              }, 3000);
               break;
           }
         });
       })();
     </script>
 
-    <script>document.getElementById('app-version').textContent = 'v' + window.scale.version;</script>
+    <script>
+      document.getElementById("app-version").textContent =
+        "v" + window.scale.version;
+    </script>
     <script type="module" src="auth.js"></script>
     <script src="index.js"></script>
   </body>

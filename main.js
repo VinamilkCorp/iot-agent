@@ -4,7 +4,7 @@ require("dotenv").config({
   path: path.join(app.isPackaged ? process.resourcesPath : __dirname, ".env"),
 });
 
-const { autoConnect, logger } = require("./src/scale");
+const { autoConnect, logger, registerExitHooks } = require("./src/scale");
 const { createWindow, askAutoStart } = require("./src/window");
 const { createTray } = require("./src/tray");
 const {
@@ -18,7 +18,6 @@ const { registerIpcHandlers, tokensPath } = require("./src/ipc");
 const { setupUpdater, autoUpdater } = require("./src/updater");
 
 let win = null;
-let tray = null;
 let authWin = null;
 let pendingAuthUrl = null;
 let _reader = null;
@@ -86,6 +85,12 @@ app.whenReady().then(() => {
   startSseServer();
 
   win = createWindow(isQuitting);
+  win.on("close", async () => {
+    await _reader?.disconnect();
+    registerExitHooks(_reader);
+    _reader = null;
+  });
+
   tray = createTray({
     getWin,
     getIsQuitting: isQuitting,
@@ -108,6 +113,7 @@ app.whenReady().then(() => {
     autoConnect()
       .then((reader) => {
         _reader = reader;
+        registerExitHooks(_reader);
         function emit(event, patch = {}) {
           updateScaleState({ event, ...patch });
           const payload = sseEmit(event, patch);
@@ -148,8 +154,8 @@ app.whenReady().then(() => {
       .catch((err) => sendError(`[autoConnect] ${err?.stack || err}`));
   }
 
-  function reloadScale() {
-    _reader?.disconnect();
+  async function reloadScale() {
+    await _reader?.disconnect();
     _reader = null;
     setScaleConnected(false);
     updateScaleState({
@@ -175,10 +181,6 @@ app.whenReady().then(() => {
   startScale();
 });
 
-app.on("before-quit", () => {
-  _reader?.disconnect();
-  _reader = null;
-});
 app.on("window-all-closed", () => {
   /* keep alive in tray */
 });
