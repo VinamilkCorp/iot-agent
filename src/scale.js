@@ -50,9 +50,10 @@ function openWithRetry(port, retries = 5, delayMs = 1500) {
     const attempt = (n) => {
       port.open((err) => {
         if (!err) return resolve();
-        const isRetryable = /SetCommState|code 31|access denied|EACCES|port is not open/i.test(
-          err.message,
-        );
+        const isRetryable =
+          /SetCommState|code 31|access denied|EACCES|port is not open/i.test(
+            err.message,
+          );
         if (n <= 1 || !isRetryable) return reject(err);
         log(
           "warn",
@@ -121,7 +122,7 @@ function probePort(path, baudRate, timeout = 3000) {
   });
 }
 
-async function detectScale(timeout = 3000) {
+async function detectScale(timeout = 2000) {
   const candidates = await findScalePorts();
   if (!candidates.length) {
     const err = new Error(
@@ -185,7 +186,10 @@ class ScaleReader extends EventEmitter {
     this._disconnecting = false;
     if (this._port) {
       this._port.removeAllListeners();
-      if (this._port.isOpen) this._port.close(() => {});
+      if (this._port.isOpen)
+        this._port.close(() => {
+          this._port?.open();
+        });
       this._port = null;
     }
     log(
@@ -259,7 +263,7 @@ class ScaleReader extends EventEmitter {
     });
   }
 
-  _scheduleReconnect(delay = 3000) {
+  _scheduleReconnect(delay = 3000, attempts = 0) {
     log("info", `ScaleReader: reconnecting in ${delay}ms…`);
     clearTimeout(this._reconnectTimer);
     this._reconnectTimer = setTimeout(() => {
@@ -269,7 +273,21 @@ class ScaleReader extends EventEmitter {
           this.baudRate = baudRate;
           this.connect();
         })
-        .catch(() => this._scheduleReconnect(delay));
+        .catch(() => {
+          if (attempts >= 3) {
+            log("info", "ScaleReader: switching to watcher mode — waiting for device plug-in…");
+            const watcher = new ScaleWatcher();
+            watcher.once("scaleFound", ({ path, baudRate }) => {
+              watcher.stop();
+              this.path = path;
+              this.baudRate = baudRate;
+              this.connect();
+            });
+            watcher.start();
+          } else {
+            this._scheduleReconnect(delay, attempts + 1);
+          }
+        });
     }, delay);
   }
 
@@ -287,7 +305,7 @@ class ScaleReader extends EventEmitter {
 }
 
 class ScaleWatcher extends EventEmitter {
-  constructor({ pollInterval = 3000, probeTimeout = 3000 } = {}) {
+  constructor({ pollInterval = 3000, probeTimeout = 2000 } = {}) {
     super();
     this._pollInterval = pollInterval;
     this._probeTimeout = probeTimeout;
