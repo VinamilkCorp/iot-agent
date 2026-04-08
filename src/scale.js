@@ -277,6 +277,7 @@ class ScaleReader extends EventEmitter {
           if (attempts >= 3) {
             log("info", "ScaleReader: switching to watcher mode — waiting for device plug-in…");
             const watcher = new ScaleWatcher();
+            watcher._knownPaths.clear();
             watcher.once("scaleFound", ({ path, baudRate }) => {
               watcher.stop();
               this.path = path;
