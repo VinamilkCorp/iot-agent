@@ -10,8 +10,7 @@ function tokensPath() {
 
 function registerIpcHandlers({ getWin, setAuthWin, getPendingAuthUrl, setPendingAuthUrl, autoUpdater, reloadScale }) {
   ipcMain.on("install-update", () => {
-    autoUpdater.quitAndInstall(true, false);
-    app.exit(0);
+    autoUpdater.quitAndInstall(true, true);
   });
   ipcMain.on("cancel-update", () => autoUpdater.autoDownload = false);
   ipcMain.handle("check-for-updates", () => {
