@@ -51,9 +51,7 @@ function openWithRetry(port, retries = 5, delayMs = 1500) {
       port.open((err) => {
         if (!err) return resolve();
         const isRetryable =
-          /SetCommState|code 31|access denied|EACCES|port is not open/i.test(
-            err.message,
-          );
+          /SetCommState|code 31|access denied|EACCES/i.test(err.message);
         if (n <= 1 || !isRetryable) return reject(err);
         log(
           "warn",
@@ -186,10 +184,7 @@ class ScaleReader extends EventEmitter {
     this._disconnecting = false;
     if (this._port) {
       this._port.removeAllListeners();
-      if (this._port.isOpen)
-        this._port.close(() => {
-          this._port?.open();
-        });
+      if (this._port.isOpen) this._port.close();
       this._port = null;
     }
     log(
