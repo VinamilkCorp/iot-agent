@@ -255,10 +255,10 @@ class ScaleReader extends EventEmitter {
   _startSignalWatch() {
     this._signalTimer = setInterval(() => {
       if (!this._port || !this._port.isOpen) return this._stopSignalWatch();
-      this._port.get((err, signals) => {
-        if (err || (!signals.cts && !signals.dsr && !signals.dcd)) {
+      this._port.get((err) => {
+        if (err) {
           this._stopSignalWatch();
-          log("warn", `ScaleReader: signal loss on ${this.path} — scale may be disconnected`);
+          log("warn", `ScaleReader: signal error on ${this.path} — scale may be disconnected`);
           this.emit("disconnected");
           this._scheduleReconnect();
         }
