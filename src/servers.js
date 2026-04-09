@@ -1,5 +1,6 @@
 const http = require("http");
 const { WebSocketServer } = require("ws");
+const { SSE_STATE_INTERVAL_MS } = require("./config");
 
 let sseClients = new Set();
 let wsClients = new Set();
@@ -62,7 +63,10 @@ function startSseServer() {
     ws.on("close", () => wsClients.delete(ws));
   });
 
-  server.listen(port, () => console.log(`[sse] listening on http://localhost:${port}/events`));
+  server.listen(port, () => {
+    console.log(`[sse] listening on http://localhost:${port}/events`);
+    setInterval(() => sseEmit("state", {}), SSE_STATE_INTERVAL_MS);
+  });
 }
 
 function startAuthServer({ getAuthWin, setAuthWin, getWin, sendError }) {
