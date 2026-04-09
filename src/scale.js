@@ -51,7 +51,8 @@ function openWithRetry(port, retries = 5, delayMs = 1500) {
       port.open((err) => {
         if (!err) return resolve();
         const isRetryable =
-          /SetCommState|code 31|access denied|EACCES/i.test(err.message);
+          /SetCommState|code 31|access denied|EACCES|port is not open|ERR_INVALID_STATE|ENXIO|cannot open|cannot find the file|device is not connected|not functioning|file not found/i.test(err.message) ||
+          [2, 31, 1167].includes(err.cause?.errno ?? err.errno);
         if (n <= 1 || !isRetryable) return reject(err);
         log(
           "warn",
@@ -169,6 +170,7 @@ class ScaleReader extends EventEmitter {
     this._lastWeight = null;
     this._port = null;
     this._reconnectTimer = null;
+    this._watcherActive = false;
   }
 
   _detectModel(line) {
@@ -187,24 +189,18 @@ class ScaleReader extends EventEmitter {
       if (this._port.isOpen) this._port.close();
       this._port = null;
     }
-    log(
-      "info",
-      `ScaleReader.connect: opening ${this.path} @ ${this.baudRate} baud`,
-    );
+    log("info", `ScaleReader.connect: opening ${this.path} @ ${this.baudRate} baud`);
     this._port = new SerialPort({
       path: this.path,
       baudRate: this.baudRate,
       ...SERIAL_DEFAULTS,
       autoOpen: false,
     });
-    const parser = this._port.pipe(new ReadlineParser({ delimiter: "\r\n" }));
 
     openWithRetry(this._port)
       .then(() => {
-        log(
-          "info",
-          `ScaleReader.connect: port open — ${this.path} @ ${this.baudRate} baud`,
-        );
+        log("info", `ScaleReader.connect: port open — ${this.path} @ ${this.baudRate} baud`);
+        this._attachListeners(this._port.pipe(new ReadlineParser({ delimiter: "\r\n" })));
         this.emit("connected", { path: this.path, baudRate: this.baudRate });
       })
       .catch((err) => {
@@ -212,29 +208,21 @@ class ScaleReader extends EventEmitter {
         const detail = isCommStateErr
           ? `${err.message} — Windows driver rejected settings for ${this.path}, will retry`
           : `${err.message} (code:${err.cause?.errno ?? err.errno ?? "?"})`;
-
-        log(
-          isCommStateErr ? "warn" : "error",
-          `ScaleReader.connect: failed to open ${this.path} — ${detail}`,
-        );
+        log(isCommStateErr ? "warn" : "error", `ScaleReader.connect: failed to open ${this.path} — ${detail}`);
         this.emit("error", Object.assign(err, { detail }));
         this._scheduleReconnect();
       });
+  }
 
+  _attachListeners(parser) {
     parser.on("data", (line) => {
       const trimmed = line.trim();
       const data = this._detectModel(trimmed);
       if (data) {
-        if (
-          this._lastWeight !== null &&
-          Math.abs(data.weight - this._lastWeight) < this._weightDelta
-        )
+        if (this._lastWeight !== null && Math.abs(data.weight - this._lastWeight) < this._weightDelta)
           return;
         this._lastWeight = data.weight;
-        log(
-          "info",
-          `ScaleReader: weight=${data.weight} ${data.unit} model=${data.model} raw="${trimmed}"`,
-        );
+        log("info", `ScaleReader: weight=${data.weight} ${data.unit} model=${data.model} raw="${trimmed}"`);
         this.emit("weight", data);
       } else {
         log("warn", `ScaleReader: unrecognised line — "${trimmed}"`);
@@ -249,40 +237,52 @@ class ScaleReader extends EventEmitter {
     });
 
     this._port.on("error", (err) => {
-      log(
-        "error",
-        `ScaleReader: port error on ${this.path} — ${err.message} (code:${err.cause?.errno ?? err.errno ?? "?"}${err.cause?.code ? " " + err.cause.code : err.code ? " " + err.code : ""})`,
-      );
+      log("error", `ScaleReader: port error on ${this.path} — ${err.message} (code:${err.cause?.errno ?? err.errno ?? "?"}${err.cause?.code ? " " + err.cause.code : err.code ? " " + err.code : ""})`);
       this.emit("error", err);
       this._scheduleReconnect();
     });
   }
 
-  _scheduleReconnect(delay = 3000, attempts = 0) {
-    log("info", `ScaleReader: reconnecting in ${delay}ms…`);
+  _scheduleReconnect(delay = 5000, attempts = 0) {
+    if (this._watcherActive) return;
+    log("info", `ScaleReader: reconnecting in ${delay}ms… (attempt ${attempts + 1})`);
     clearTimeout(this._reconnectTimer);
     this._reconnectTimer = setTimeout(() => {
-      detectScale()
-        .then(({ path, baudRate }) => {
-          this.path = path;
-          this.baudRate = baudRate;
-          this.connect();
+      // Fast path: try to reopen the same port directly
+      const port = new SerialPort({ path: this.path, baudRate: this.baudRate, ...SERIAL_DEFAULTS, autoOpen: false });
+      openWithRetry(port)
+        .then(() => {
+          log("info", `ScaleReader: reopened ${this.path} (fast path)`);
+          this._port = port;
+          this._attachListeners(port.pipe(new ReadlineParser({ delimiter: "\r\n" })));
+          this.emit("connected", { path: this.path, baudRate: this.baudRate });
         })
         .catch(() => {
-          if (attempts >= 3) {
-            log("info", "ScaleReader: switching to watcher mode — waiting for device plug-in…");
-            const watcher = new ScaleWatcher();
-            watcher._knownPaths.clear();
-            watcher.once("scaleFound", ({ path, baudRate }) => {
-              watcher.stop();
+          port.removeAllListeners();
+          // Fallback: re-detect in case Windows reassigned the COM port
+          detectScale()
+            .then(({ path, baudRate }) => {
               this.path = path;
               this.baudRate = baudRate;
               this.connect();
+            })
+            .catch(() => {
+              if (attempts >= 3) {
+                log("info", "ScaleReader: switching to watcher mode — waiting for device plug-in…");
+                this._watcherActive = true;
+                const watcher = new ScaleWatcher();
+                watcher.once("scaleFound", ({ path, baudRate }) => {
+                  watcher.stop();
+                  this._watcherActive = false;
+                  this.path = path;
+                  this.baudRate = baudRate;
+                  this.connect();
+                });
+                watcher.start();
+              } else {
+                this._scheduleReconnect(Math.min(delay * 1.5, 15000), attempts + 1);
+              }
             });
-            watcher.start();
-          } else {
-            this._scheduleReconnect(delay, attempts + 1);
-          }
         });
     }, delay);
   }
