@@ -21,8 +21,9 @@
     "publish:all": "electron-builder --win --mac --publish always"
   },
   "build": {
-    "appId": "com.yourcompany.iot-scale",
-    "productName": "IoT Scale",
+    "appId": "com.vinamilk.iot-scale",
+    "productName": "VNM IOT Scale",
+    "artifactName": "${productName}.${ext}",
     "publish": {
       "provider": "github",
       "owner": "VinamilkCorp",
