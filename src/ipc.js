@@ -8,11 +8,18 @@ function tokensPath() {
   return path.join(app.getPath("userData"), "tokens.enc");
 }
 
-function registerIpcHandlers({ getWin, setAuthWin, getPendingAuthUrl, setPendingAuthUrl, autoUpdater, reloadScale }) {
+function registerIpcHandlers({
+  getWin,
+  setAuthWin,
+  getPendingAuthUrl,
+  setPendingAuthUrl,
+  autoUpdater,
+  reloadScale,
+}) {
   ipcMain.on("install-update", () => {
-    autoUpdater.quitAndInstall(true, true);
+    autoUpdater.quitAndInstall(false, true);
   });
-  ipcMain.on("cancel-update", () => autoUpdater.autoDownload = false);
+  ipcMain.on("cancel-update", () => (autoUpdater.autoDownload = false));
   ipcMain.handle("check-for-updates", () => {
     autoUpdater.autoDownload = true;
     return autoUpdater.checkForUpdates();
@@ -67,7 +74,11 @@ function registerIpcHandlers({ getWin, setAuthWin, getPendingAuthUrl, setPending
   });
 
   ipcMain.handle("open-login-url", (_e, url) => {
-    const authWin = new BrowserWindow({ width: 800, height: 700, title: "Login" });
+    const authWin = new BrowserWindow({
+      width: 800,
+      height: 700,
+      title: "Login",
+    });
     authWin.loadURL(url);
     authWin.on("closed", () => setAuthWin(null));
     setAuthWin(authWin);
