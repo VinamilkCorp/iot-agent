@@ -45,19 +45,18 @@ const SERIAL_DEFAULTS = {
   hupcl: false,
 };
 
-function openWithRetry(port, retries = 5, delayMs = 1500) {
+function openWithRetry(path, baudRate, retries = 8, delayMs = 2000) {
   return new Promise((resolve, reject) => {
     const attempt = (n) => {
+      const port = new SerialPort({ path, baudRate, ...SERIAL_DEFAULTS, autoOpen: false });
       port.open((err) => {
-        if (!err) return resolve();
-        const isRetryable = /SetCommState|code 31|access denied|EACCES|port is not open/i.test(
-          err.message,
-        );
+        if (!err) return resolve(port);
+        port.removeAllListeners();
+        const isRetryable =
+          /SetCommState|code 31|access denied|EACCES|port is not open|ERR_INVALID_STATE|ENXIO|cannot open|cannot find the file|device is not connected|not functioning|file not found/i.test(err.message) ||
+          [2, 31, 1167].includes(err.cause?.errno ?? err.errno);
         if (n <= 1 || !isRetryable) return reject(err);
-        log(
-          "warn",
-          `openWithRetry: ${err.message} — retrying in ${delayMs}ms… (${n - 1} left)`,
-        );
+        log("warn", `openWithRetry: ${err.message} — retrying in ${delayMs}ms… (${n - 1} left)`);
         setTimeout(() => attempt(n - 1), delayMs);
       });
     };
@@ -66,62 +65,52 @@ function openWithRetry(port, retries = 5, delayMs = 1500) {
 }
 
 function probePort(path, baudRate, timeout = 3000) {
-  log(
-    "info",
-    `probePort: trying ${path} @ ${baudRate} baud (dataBits:${SERIAL_DEFAULTS.dataBits} stopBits:${SERIAL_DEFAULTS.stopBits} parity:${SERIAL_DEFAULTS.parity})`,
-  );
+  log("info", `probePort: trying ${path} @ ${baudRate} baud`);
   return new Promise((resolve, reject) => {
-    const port = new SerialPort({
-      path,
-      baudRate,
-      ...SERIAL_DEFAULTS,
-      autoOpen: false,
-    });
-    const parser = port.pipe(new ReadlineParser({ delimiter: "\r\n" }));
+    let settled = false;
+    let port = null;
+
+    const done = (err, result) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timer);
+      if (port) {
+        port.removeAllListeners();
+        if (port.isOpen) port.close(() => {});
+      }
+      err ? reject(err) : resolve(result);
+    };
+
     const timer = setTimeout(() => {
-      port.close();
-      const err = new Error(
-        `probePort timeout: no valid data from ${path} @ ${baudRate} baud after ${timeout}ms`,
-      );
-      log("warn", err.message);
-      reject(err);
+      done(new Error(`probePort timeout: no valid data from ${path} @ ${baudRate} baud after ${timeout}ms`));
     }, timeout);
 
-    parser.on("data", (line) => {
-      const result =
-        genericParse(line) ||
-        MODEL_PROFILES.reduce((acc, p) => acc || p.parse(line), null);
-      if (result) {
-        clearTimeout(timer);
-        port.close();
-        log(
-          "info",
-          `probePort: matched ${path} @ ${baudRate} — sample: "${line.trim()}"`,
-        );
-        resolve({ path, baudRate, sample: line.trim() });
-      }
-    });
-
-    openWithRetry(port)
-      .then(() => {
-        log(
-          "info",
-          `probePort: opened ${path} @ ${baudRate}, waiting for data…`,
-        );
+    openWithRetry(path, baudRate)
+      .then((openedPort) => {
+        if (settled) { openedPort.removeAllListeners(); openedPort.close(() => {}); return; }
+        port = openedPort;
+        log("info", `probePort: opened ${path} @ ${baudRate}, waiting for data…`);
+        const parser = port.pipe(new ReadlineParser({ delimiter: "\r\n" }));
+        parser.on("data", (line) => {
+          const result =
+            genericParse(line) ||
+            MODEL_PROFILES.reduce((acc, p) => acc || p.parse(line), null);
+          if (result) {
+            log("info", `probePort: matched ${path} @ ${baudRate} — sample: "${line.trim()}"`);
+            done(null, { path, baudRate, sample: line.trim() });
+          }
+        });
+        port.on("error", (err) => done(err));
       })
       .catch((err) => {
-        clearTimeout(timer);
         const isCommStateErr = /SetCommState|code 31/i.test(err.message);
-        log(
-          isCommStateErr ? "warn" : "error",
-          `probePort: failed to open ${path} @ ${baudRate} — ${err.message}`,
-        );
-        reject(err);
+        log(isCommStateErr ? "warn" : "error", `probePort: failed to open ${path} @ ${baudRate} — ${err.message}`);
+        done(err);
       });
   });
 }
 
-async function detectScale(timeout = 3000) {
+async function detectScale(timeout = 2000) {
   const candidates = await findScalePorts();
   if (!candidates.length) {
     const err = new Error(
@@ -170,6 +159,7 @@ class ScaleReader extends EventEmitter {
     this._lastWeight = null;
     this._port = null;
     this._reconnectTimer = null;
+    this._watcherActive = false;
   }
 
   _detectModel(line) {
@@ -188,24 +178,14 @@ class ScaleReader extends EventEmitter {
       if (this._port.isOpen) this._port.close(() => {});
       this._port = null;
     }
-    log(
-      "info",
-      `ScaleReader.connect: opening ${this.path} @ ${this.baudRate} baud`,
-    );
-    this._port = new SerialPort({
-      path: this.path,
-      baudRate: this.baudRate,
-      ...SERIAL_DEFAULTS,
-      autoOpen: false,
-    });
-    const parser = this._port.pipe(new ReadlineParser({ delimiter: "\r\n" }));
+    log("info", `ScaleReader.connect: opening ${this.path} @ ${this.baudRate} baud`);
 
-    openWithRetry(this._port)
-      .then(() => {
-        log(
-          "info",
-          `ScaleReader.connect: port open — ${this.path} @ ${this.baudRate} baud`,
-        );
+    openWithRetry(this.path, this.baudRate)
+      .then((port) => {
+        if (this._disconnecting) { port.removeAllListeners(); port.close(() => {}); return; }
+        this._port = port;
+        log("info", `ScaleReader.connect: port open — ${this.path} @ ${this.baudRate} baud`);
+        this._attachListeners(port.pipe(new ReadlineParser({ delimiter: "\r\n" })));
         this.emit("connected", { path: this.path, baudRate: this.baudRate });
       })
       .catch((err) => {
@@ -213,29 +193,21 @@ class ScaleReader extends EventEmitter {
         const detail = isCommStateErr
           ? `${err.message} — Windows driver rejected settings for ${this.path}, will retry`
           : `${err.message} (code:${err.cause?.errno ?? err.errno ?? "?"})`;
-
-        log(
-          isCommStateErr ? "warn" : "error",
-          `ScaleReader.connect: failed to open ${this.path} — ${detail}`,
-        );
+        log(isCommStateErr ? "warn" : "error", `ScaleReader.connect: failed to open ${this.path} — ${detail}`);
         this.emit("error", Object.assign(err, { detail }));
         this._scheduleReconnect();
       });
+  }
 
+  _attachListeners(parser) {
     parser.on("data", (line) => {
       const trimmed = line.trim();
       const data = this._detectModel(trimmed);
       if (data) {
-        if (
-          this._lastWeight !== null &&
-          Math.abs(data.weight - this._lastWeight) < this._weightDelta
-        )
+        if (this._lastWeight !== null && Math.abs(data.weight - this._lastWeight) < this._weightDelta)
           return;
         this._lastWeight = data.weight;
-        log(
-          "info",
-          `ScaleReader: weight=${data.weight} ${data.unit} model=${data.model} raw="${trimmed}"`,
-        );
+        log("info", `ScaleReader: weight=${data.weight} ${data.unit} model=${data.model} raw="${trimmed}"`);
         this.emit("weight", data);
       } else {
         log("warn", `ScaleReader: unrecognised line — "${trimmed}"`);
@@ -250,27 +222,71 @@ class ScaleReader extends EventEmitter {
     });
 
     this._port.on("error", (err) => {
-      log(
-        "error",
-        `ScaleReader: port error on ${this.path} — ${err.message} (code:${err.cause?.errno ?? err.errno ?? "?"}${err.cause?.code ? " " + err.cause.code : err.code ? " " + err.code : ""})`,
-      );
+      log("error", `ScaleReader: port error on ${this.path} — ${err.message} (code:${err.cause?.errno ?? err.errno ?? "?"}${err.cause?.code ? " " + err.cause.code : err.code ? " " + err.code : ""})`);
       this.emit("error", err);
       this._scheduleReconnect();
     });
   }
 
-  _scheduleReconnect(delay = 3000) {
-    log("info", `ScaleReader: reconnecting in ${delay}ms…`);
+  _scheduleReconnect(delay = 5000, attempts = 0) {
+    if (this._watcherActive || this._disconnecting) return;
+    log("info", `ScaleReader: reconnecting in ${delay}ms… (attempt ${attempts + 1})`);
     clearTimeout(this._reconnectTimer);
     this._reconnectTimer = setTimeout(() => {
-      detectScale()
-        .then(({ path, baudRate }) => {
-          this.path = path;
-          this.baudRate = baudRate;
-          this.connect();
-        })
-        .catch(() => this._scheduleReconnect(delay));
+      if (this._disconnecting) return;
+      // Ensure old port is fully released before reopening
+      const cleanup = () => {
+        if (this._port) {
+          this._port.removeAllListeners();
+          this._port = null;
+        }
+      };
+      if (this._port && this._port.isOpen) {
+        this._port.close(() => { cleanup(); this._tryReopen(delay, attempts); });
+      } else {
+        cleanup();
+        this._tryReopen(delay, attempts);
+      }
     }, delay);
+  }
+
+  _tryReopen(delay, attempts) {
+    if (this._disconnecting) return;
+    // Fast path: reopen same port
+    openWithRetry(this.path, this.baudRate)
+      .then((port) => {
+        if (this._disconnecting) { port.removeAllListeners(); port.close(() => {}); return; }
+        log("info", `ScaleReader: reopened ${this.path} (fast path)`);
+        this._port = port;
+        this._attachListeners(port.pipe(new ReadlineParser({ delimiter: "\r\n" })));
+        this.emit("connected", { path: this.path, baudRate: this.baudRate });
+      })
+      .catch(() => {
+        // Fallback: re-detect in case Windows reassigned the COM port
+        detectScale()
+          .then(({ path, baudRate }) => {
+            this.path = path;
+            this.baudRate = baudRate;
+            this.connect();
+          })
+          .catch(() => {
+            if (attempts >= 3) {
+              log("info", "ScaleReader: switching to watcher mode — waiting for device plug-in…");
+              this._watcherActive = true;
+              const watcher = new ScaleWatcher();
+              watcher.once("scaleFound", ({ path, baudRate }) => {
+                watcher.stop();
+                this._watcherActive = false;
+                this.path = path;
+                this.baudRate = baudRate;
+                this.connect();
+              });
+              watcher.start();
+            } else {
+              this._scheduleReconnect(Math.min(delay * 1.5, 15000), attempts + 1);
+            }
+          });
+      });
   }
 
   disconnect() {
@@ -278,8 +294,8 @@ class ScaleReader extends EventEmitter {
     this._disconnecting = true;
     clearTimeout(this._reconnectTimer);
     return new Promise((resolve) => {
+      if (!this._port || !this._port.isOpen) return resolve();
       this._port.close(() => resolve());
-      resolve();
     }).catch((reason) => {
       log("error", `Disconnecting reader from ${reason}`);
     });
@@ -287,7 +303,7 @@ class ScaleReader extends EventEmitter {
 }
 
 class ScaleWatcher extends EventEmitter {
-  constructor({ pollInterval = 3000, probeTimeout = 3000 } = {}) {
+  constructor({ pollInterval = 3000, probeTimeout = 2000 } = {}) {
     super();
     this._pollInterval = pollInterval;
     this._probeTimeout = probeTimeout;
