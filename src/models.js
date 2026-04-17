@@ -26,6 +26,28 @@ const MODEL_PROFILES = [
     },
   },
   {
+    name: "XK3118T1 (Yaohua)",
+    baudRate: 9600,
+    parse: (line) => {
+      const m = line.match(/([+-]?\s*\d+\.?\d*)\s*(kg|g|lb)/i);
+      return m
+        ? {
+            weight: parseFloat(m[1].replace(/\s/g, "")),
+            unit: m[2].toLowerCase(),
+          }
+        : null;
+    },
+  },
+  {
+    name: "Defender 3000 i-D33P300B1X2 (OHAUS)",
+    baudRate: 9600,
+    // OHAUS continuous: " +0001.234 kg"
+    parse: (line) => {
+      const m = line.match(/^\s*([+-]?\d+\.?\d*)\s*(kg|g|lb)/i);
+      return m ? { weight: parseFloat(m[1]), unit: m[2].toLowerCase() } : null;
+    },
+  },
+  {
     name: "IND231 (Mettler Toledo)",
     baudRate: 9600,
     // MT-SICS: "S S      1.234 kg" or "S D      1.234 kg"
