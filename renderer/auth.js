@@ -1,4 +1,4 @@
-// ── In-memory token state ─────────────────────────────────────────────────────
+// ── Trạng thái token trong bộ nhớ ─────────────────────────────────────────────
 let currentTokens = null;
 let _refreshTimer = null;
 let _env = null;
@@ -6,6 +6,7 @@ let _env = null;
 const TOKEN_EXPIRY_BUFFER_SEC = 30;
 const TOKEN_PROACTIVE_REFRESH_SEC = 180;
 
+// Giải mã JWT và trả về thời điểm hết hạn (exp)
 function tokenExp(token) {
   try {
     return JSON.parse(atob(token.split(".")[1])).exp;
@@ -14,6 +15,7 @@ function tokenExp(token) {
   }
 }
 
+// Lên lịch tự động làm mới token trước khi hết hạn
 function scheduleProactiveRefresh() {
   clearTimeout(_refreshTimer);
   if (!currentTokens?.access_token) return;
@@ -34,10 +36,12 @@ function scheduleProactiveRefresh() {
   log.info(`next proactive refresh in ${Math.round(msUntilRefresh / 1000)}s`);
 }
 
+// Lấy access token hợp lệ, tự động làm mới nếu đã hết hạn
 async function getAccessToken() {
   if (!currentTokens?.access_token) throw new Error("not authenticated");
   if (!isTokenExpired(currentTokens.access_token))
     return currentTokens.access_token;
+  // Nếu refresh token cũng hết hạn thì yêu cầu đăng nhập lại
   if (
     !currentTokens.refresh_token ||
     isTokenExpired(currentTokens.refresh_token)
@@ -55,6 +59,7 @@ async function getAccessToken() {
 
 window.auth = { getAccessToken };
 
+// Các phần tử DOM của màn hình đăng nhập
 const loginScreen  = document.getElementById("login-screen");
 const loginStatus  = document.getElementById("login-status");
 const loginError   = document.getElementById("login-error");
@@ -67,6 +72,7 @@ const log = {
   error: (msg) => console.error(`[auth] ${msg}`),
 };
 
+// Hiển thị trạng thái đang tải trên màn hình đăng nhập
 function setLoading(text) {
   loginBtn.disabled = true;
   loginSpinner.style.display = "block";
@@ -75,6 +81,7 @@ function setLoading(text) {
   loginError.style.display = "none";
 }
 
+// Hiển thị thông báo lỗi đăng nhập
 function showError(msg) {
   const text = msg instanceof Error ? msg.message : String(msg);
   log.error(text);
@@ -85,11 +92,13 @@ function showError(msg) {
   loginError.textContent = text;
 }
 
+// Ẩn màn hình đăng nhập khi xác thực thành công
 function onLoginSuccess() {
   log.info("authentication successful — showing main UI");
   loginScreen.style.display = "none";
 }
 
+// Kiểm tra token có hết hạn chưa (có tính buffer)
 function isTokenExpired(token) {
   try {
     const payload = JSON.parse(atob(token.split(".")[1]));
@@ -99,6 +108,7 @@ function isTokenExpired(token) {
   }
 }
 
+// Gọi API làm mới token bằng refresh token
 async function refreshTokens(env, refreshToken) {
   const tokenUrl = `${env.LOGIN_URL}/realms/${env.LOGIN_REALM}/protocol/openid-connect/token`;
   const res = await fetch(tokenUrl, {
@@ -118,6 +128,7 @@ async function refreshTokens(env, refreshToken) {
   return tokens;
 }
 
+// Đổi authorization code lấy access token và refresh token
 async function exchangeCode(env, code) {
   const tokenUrl = `${env.LOGIN_URL}/realms/${env.LOGIN_REALM}/protocol/openid-connect/token`;
   const res = await fetch(tokenUrl, {
@@ -138,6 +149,7 @@ async function exchangeCode(env, code) {
   return tokens;
 }
 
+// Chờ callback xác thực từ main process (deep link hoặc redirect)
 function waitForCallback() {
   return new Promise((resolve) => {
     window.scale.onAuthCallback((params) => {
@@ -147,6 +159,7 @@ function waitForCallback() {
   });
 }
 
+// Bắt đầu luồng đăng nhập OAuth: mở trình duyệt và chờ callback
 async function startLoginFlow(env) {
   const state = crypto.randomUUID();
   const nonce = crypto.randomUUID();
@@ -167,6 +180,7 @@ async function startLoginFlow(env) {
   await window.scale.reloadWithCallback(callbackParams);
 }
 
+// Khởi tạo xác thực: kiểm tra session cũ, đổi code, hoặc hiện nút đăng nhập
 async function initAuth() {
   log.info("initAuth started");
   _env = await window.scale.getEnv();
@@ -181,11 +195,12 @@ async function initAuth() {
     return onLoginSuccess();
   }
 
-  // expose login trigger for the home page button
+  // Expose hàm đăng nhập cho nút trên trang chủ
   window.auth.startLogin = async () => {
     try { await startLoginFlow(_env); } catch (err) { showError(err); }
   };
 
+  // Xử lý callback OAuth được lưu trong sessionStorage (sau khi reload)
   const storedCallback = sessionStorage.getItem("kcCallback");
   if (storedCallback) {
     sessionStorage.removeItem("kcCallback");
@@ -206,6 +221,7 @@ async function initAuth() {
     }
   }
 
+  // Thử làm mới token từ session đã lưu
   const stored = await window.scale.loadTokens();
   if (stored?.refresh_token) {
     if (!isTokenExpired(stored.refresh_token)) {
@@ -233,7 +249,7 @@ async function initAuth() {
   }
 
   log.info("no valid session — showing login button");
-  // home page is already visible; user clicks Login to proceed
+  // Trang chủ đã hiển thị, người dùng nhấn Login để tiếp tục
 }
 
 initAuth();

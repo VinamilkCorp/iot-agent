@@ -1,3 +1,4 @@
+// Chuyển đổi tab hiển thị (overview / monitor / log)
 function showTab(name) {
   document
     .querySelectorAll(".tab")
@@ -12,6 +13,7 @@ function showTab(name) {
   if (name === "monitor") drawChart();
 }
 
+// Kết nối WebSocket tới server dashboard
 const wsProto = location.protocol === "https:" ? "wss" : "ws";
 const ws = new WebSocket(`${wsProto}://${location.host}`);
 
@@ -24,6 +26,7 @@ ws.onclose = () => {
   log("WebSocket disconnected", "error");
 };
 
+// Xử lý sự kiện nhận từ WebSocket
 ws.onmessage = (e) => {
   const data = JSON.parse(e.data);
   if (data.event === "connected") {
@@ -49,16 +52,19 @@ ws.onmessage = (e) => {
   }
 };
 
+// Cập nhật trạng thái kết nối WebSocket trên UI
 function setWsStatus(dot, text) {
   document.getElementById("ws-status").innerHTML =
     `<span class="dot ${dot}"></span>${text}`;
 }
+// Cập nhật trạng thái kết nối cân trên UI
 function setScaleStatus(dot, text, meta = "") {
   document.getElementById("scale-dot").className = `dot ${dot}`;
   document.getElementById("scale-status-text").textContent = text;
   document.getElementById("scale-meta").textContent = meta;
 }
 
+// Quản lý log hiển thị trên giao diện
 const logEl = document.getElementById("log-body");
 let logPaused = false;
 function toggleLog() {
@@ -74,12 +80,14 @@ function log(msg, cls = "info") {
   line.textContent = `[${new Date().toLocaleTimeString()}] ${msg}`;
   logEl.appendChild(line);
   logEl.scrollTop = logEl.scrollHeight;
+  // Giới hạn tối đa 500 dòng log
   while (logEl.children.length > 500) logEl.removeChild(logEl.firstChild);
 }
 function clearLog() {
   logEl.innerHTML = "";
 }
 
+// Tạo bảng HTML hiển thị danh sách cổng serial
 function renderPortsTable(ports, scalePaths = new Set()) {
   if (!ports.length) return '<span class="empty">No ports found</span>';
   return `<table><tr><th>Path</th><th>Manufacturer</th><th>VID</th><th>PID</th></tr>
@@ -92,6 +100,7 @@ function renderPortsTable(ports, scalePaths = new Set()) {
       )
       .join("")}</table>`;
 }
+// Tải và hiển thị tất cả cổng serial
 async function loadPorts() {
   document.getElementById("ports-body").innerHTML =
     '<span class="empty">Loading…</span>';
@@ -104,6 +113,7 @@ async function loadPorts() {
     new Set(scale.map((p) => p.path)),
   );
 }
+// Tải và hiển thị chỉ các cổng cân
 async function loadScalePorts() {
   document.getElementById("scale-ports-body").innerHTML =
     '<span class="empty">Loading…</span>';
@@ -114,9 +124,11 @@ async function loadScalePorts() {
 loadPorts();
 loadScalePorts();
 
+// Lịch sử cân nặng (tối đa 10 phút gần nhất)
 const history = [];
 let currentUnit = "";
 
+// Thêm số liệu mới vào lịch sử và cập nhật thống kê
 function pushReading(weight, unit) {
   currentUnit = unit;
   history.push({ t: new Date(), w: weight, unit });
@@ -132,18 +144,22 @@ function clearHistory() {
   updateStats();
   drawChart();
 }
+// Lấy khoảng thời gian hiển thị (giây) từ dropdown
 function windowSec() {
   return parseInt(document.getElementById("window-select").value, 10);
 }
+// Lấy giá trị ngưỡng cảnh báo từ input
 function threshold() {
   return parseFloat(document.getElementById("threshold-input").value) || null;
 }
 
+// Lọc các điểm dữ liệu trong khoảng thời gian hiển thị
 function visiblePoints() {
   const cutoff = Date.now() - windowSec() * 1000;
   return history.filter((p) => p.t.getTime() >= cutoff);
 }
 
+// Cập nhật các thống kê: min, max, trung bình, giá trị cuối
 function updateStats() {
   const pts = visiblePoints();
   document.getElementById("stat-count").textContent = pts.length;
@@ -163,6 +179,7 @@ function updateStats() {
   document.getElementById("stat-last").textContent = fmt(vals[vals.length - 1]);
 }
 
+// Vẽ biểu đồ cân nặng theo thời gian trên canvas
 function drawChart() {
   const canvas = document.getElementById("chart");
   const wrap = document.getElementById("chart-wrap");
@@ -189,6 +206,7 @@ function drawChart() {
   const times = pts.map((p) => p.t.getTime());
   let minV = Math.min(...vals),
     maxV = Math.max(...vals);
+  // Đảm bảo có khoảng hiển thị khi tất cả giá trị bằng nhau
   if (minV === maxV) {
     minV -= 0.5;
     maxV += 0.5;
@@ -198,9 +216,11 @@ function drawChart() {
     maxT = times[times.length - 1];
   const rangeT = maxT - minT || 1;
 
+  // Hàm chuyển đổi giá trị sang toạ độ canvas
   const xOf = (t) => PAD.left + ((t - minT) / rangeT) * cw;
   const yOf = (v) => PAD.top + (1 - (v - minV) / rangeV) * ch;
 
+  // Vẽ lưới và nhãn trục Y
   ctx.strokeStyle = "#1e1e1e";
   ctx.lineWidth = 1;
   const yTicks = 5;
@@ -217,6 +237,7 @@ function drawChart() {
     ctx.fillText(v.toFixed(3), PAD.left - 6, y + 3);
   }
 
+  // Vẽ nhãn trục X (thời gian)
   ctx.textAlign = "center";
   ctx.fillStyle = "#555";
   const xTicks = Math.min(6, pts.length);
@@ -225,6 +246,7 @@ function drawChart() {
     ctx.fillText(new Date(t).toLocaleTimeString(), xOf(t), H - PAD.bottom + 16);
   }
 
+  // Vẽ đường ngưỡng cảnh báo nếu có
   const thr = threshold();
   if (thr !== null && thr >= minV && thr <= maxV) {
     ctx.strokeStyle = "#e53935";
@@ -242,6 +264,7 @@ function drawChart() {
   }
   ctx.setLineDash([]);
 
+  // Vẽ đường biểu đồ chính
   ctx.strokeStyle = "#4caf50";
   ctx.lineWidth = 2;
   ctx.lineJoin = "round";
@@ -253,12 +276,14 @@ function drawChart() {
   });
   ctx.stroke();
 
+  // Tô màu vùng dưới đường biểu đồ
   ctx.lineTo(xOf(times[times.length - 1]), PAD.top + ch);
   ctx.lineTo(xOf(times[0]), PAD.top + ch);
   ctx.closePath();
   ctx.fillStyle = "rgba(76,175,80,0.08)";
   ctx.fill();
 
+  // Vẽ các điểm dữ liệu
   ctx.fillStyle = "#4caf50";
   pts.forEach((p) => {
     ctx.beginPath();
@@ -266,12 +291,14 @@ function drawChart() {
     ctx.fill();
   });
 
+  // Hiển thị đơn vị đo
   ctx.fillStyle = "#555";
   ctx.textAlign = "left";
   ctx.font = "10px monospace";
   ctx.fillText(currentUnit, 4, PAD.top);
 }
 
+// Vẽ lại biểu đồ khi thay đổi kích thước cửa sổ
 window.addEventListener("resize", () => {
   if (document.getElementById("tab-monitor").classList.contains("active"))
     drawChart();
@@ -282,6 +309,7 @@ document.getElementById("window-select").addEventListener("change", () => {
 });
 document.getElementById("threshold-input").addEventListener("input", drawChart);
 
+// Xuất lịch sử cân nặng ra file CSV
 function exportCsv() {
   const rows = [
     "time,weight,unit",

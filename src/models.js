@@ -1,7 +1,9 @@
+// Danh sách profile các model cân được hỗ trợ, mỗi profile có hàm parse riêng
 const MODEL_PROFILES = [
   {
     name: "XK3190-T7E (Yaohua)",
     baudRate: 9600,
+    // Phân tích chuỗi dữ liệu dạng "±số đơn_vị"
     parse: (line) => {
       const m = line.match(/([+-]?\s*\d+\.?\d*)\s*(kg|g|lb)/i);
       return m
@@ -67,6 +69,7 @@ const MODEL_PROFILES = [
   },
 ];
 
+// Hàm phân tích chung cho các cân không khớp với profile cụ thể nào
 function genericParse(line) {
   const m = line.match(/([+-]?\d+\.?\d*)\s*(kg|g|lb)/i);
   return m ? { weight: parseFloat(m[1]), unit: m[2].toLowerCase() } : null;

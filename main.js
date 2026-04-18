@@ -1,5 +1,6 @@
 const { app } = require("electron");
 const path = require("path");
+// Tải biến môi trường từ file .env (hỗ trợ cả môi trường đóng gói và dev)
 require("dotenv").config({
   path: path.join(app.isPackaged ? process.resourcesPath : __dirname, ".env"),
 });
@@ -17,6 +18,7 @@ const {
 const { registerIpcHandlers, tokensPath } = require("./src/ipc");
 const { setupUpdater, autoUpdater } = require("./src/updater");
 
+// Biến toàn cục quản lý cửa sổ và trạng thái ứng dụng
 let win = null;
 let authWin = null;
 let pendingAuthUrl = null;
@@ -34,10 +36,12 @@ const setPendingAuthUrl = (v) => {
 };
 const isQuitting = () => _isQuitting;
 
+// Gửi thông báo lỗi tới renderer
 function sendError(msg) {
   win?.webContents.send("app-error", msg);
 }
 
+// Bắt lỗi không xử lý được ở cấp process
 process.on("uncaughtException", (err) => {
   console.error("[uncaughtException]", err);
   sendError(`[uncaughtException] ${err?.stack || err}`);
@@ -47,9 +51,11 @@ process.on("unhandledRejection", (reason) => {
   sendError(`[unhandledRejection] ${reason?.stack || reason}`);
 });
 
+// Đảm bảo chỉ chạy một instance duy nhất
 const gotLock = app.requestSingleInstanceLock();
 if (!gotLock) app.quit();
 
+// Xử lý khi instance thứ hai được mở (deep link hoặc gọi lại từ OAuth)
 app.on("second-instance", (_e, argv) => {
   pendingAuthUrl = argv.find((a) => a.startsWith("iotscale://")) ?? null;
   console.log("[main] second-instance argv:", argv);
@@ -65,9 +71,11 @@ app.on("second-instance", (_e, argv) => {
   }
 });
 
+// Đăng ký giao thức deep link iotscale://
 app.setAsDefaultProtocolClient("iotscale");
 
 app.whenReady().then(() => {
+  // Xử lý deep link trên macOS (open-url event)
   app.on("open-url", (_e, url) => {
     pendingAuthUrl = url;
     if (authWin) {
@@ -81,9 +89,11 @@ app.whenReady().then(() => {
     }
   });
 
+  // Khởi động server xác thực và SSE
   startAuthServer({ getAuthWin, setAuthWin, getWin, sendError });
   startSseServer();
 
+  // Tạo cửa sổ chính và xử lý sự kiện đóng
   win = createWindow(isQuitting);
   win.on("close", async () => {
     await _reader?.disconnect();
@@ -91,6 +101,7 @@ app.whenReady().then(() => {
     _reader = null;
   });
 
+  // Tạo icon khay hệ thống
   tray = createTray({
     getWin,
     getIsQuitting: isQuitting,
@@ -102,18 +113,24 @@ app.whenReady().then(() => {
     app,
   });
 
+  // Thiết lập module cập nhật tự động
   setupUpdater(getWin);
 
+  // Hỏi người dùng có muốn khởi động cùng hệ thống không (lần đầu)
   const { wasOpenedAtLogin } = app.getLoginItemSettings();
   if (!wasOpenedAtLogin) askAutoStart();
 
+  // Chuyển tiếp log từ scale tới renderer
   logger.on("log", (entry) => win?.webContents.send("log", entry));
 
+  // Kết nối cân và đăng ký các sự kiện
   function startScale() {
     autoConnect()
       .then((reader) => {
         _reader = reader;
         registerExitHooks(_reader);
+
+        // Phát sự kiện tới SSE và renderer
         function emit(event, patch = {}) {
           updateScaleState({ event, ...patch });
           const payload = sseEmit(event, patch);
@@ -154,6 +171,7 @@ app.whenReady().then(() => {
       .catch((err) => sendError(`[autoConnect] ${err?.stack || err}`));
   }
 
+  // Ngắt kết nối cân hiện tại và kết nối lại
   async function reloadScale() {
     await _reader?.disconnect();
     _reader = null;
@@ -169,6 +187,7 @@ app.whenReady().then(() => {
     startScale();
   }
 
+  // Đăng ký các IPC handler cho renderer
   registerIpcHandlers({
     getWin,
     setAuthWin,
@@ -181,6 +200,7 @@ app.whenReady().then(() => {
   startScale();
 });
 
+// Giữ ứng dụng chạy trong khay khi đóng tất cả cửa sổ
 app.on("window-all-closed", () => {
   /* keep alive in tray */
 });
