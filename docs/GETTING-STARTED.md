@@ -7,17 +7,23 @@ npm install
 npm start
 ```
 
+## IMPORTANT V:L
+
+**⭐ Nhớ tăng version package mỗi lần publish, để app biết là cần update, hạn chế đổi tên do publish mà đổi tên thì sẽ ra 2 app **
+**⭐ Dùng app trên win thì phải build qua Win, dùng quyền administrator trên Window powershell **
+| **`npm run publish:winN`** | **⭐ Lệnh publish chính — chạy cả ia32 và x64 song song trên Windows** |
+
 ### Build & Publish
 
-| Lệnh                  | Mô tả                              |
-| --------------------- | ---------------------------------- |
-| `npm run build`       | Build cho nền tảng hiện tại        |
-| `npm run build:win`   | Build bộ cài đặt Windows           |
-| `npm run build:mac`   | Build file DMG cho macOS           |
-| `npm run publish:win` | Publish Windows (cả hai kiến trúc) |
+| Lệnh                       | Mô tả                                                                  |
+| -------------------------- | ---------------------------------------------------------------------- |
+| `npm run build`            | Build cho nền tảng hiện tại                                            |
+| `npm run build:win`        | Build bộ cài đặt Windows                                               |
+| `npm run build:mac`        | Build file DMG cho macOS                                               |
+| `npm run publish:win`      | Publish Windows (cả hai kiến trúc)                                     |
 | **`npm run publish:winN`** | **⭐ Lệnh publish chính — chạy cả ia32 và x64 song song trên Windows** |
-| `npm run publish:mac` | Publish macOS |
-| `npm run publish:all` | Publish Windows + macOS |
+| `npm run publish:mac`      | Publish macOS                                                          |
+| `npm run publish:all`      | Publish Windows + macOS                                                |
 
 Publish sẽ đẩy bản phát hành lên GitHub (`VinamilkCorp/iot-agent`) thông qua `electron-builder`. Yêu cầu biến môi trường `GH_TOKEN` hợp lệ có quyền ghi vào repo.
 
