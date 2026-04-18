@@ -45,7 +45,9 @@ const SERIAL_DEFAULTS = {
   hupcl: false,
 };
 
-function openWithRetry(path, baudRate, retries = 8, delayMs = 2000) {
+const UNKNOWN_ERROR = [2, 31, 1167];
+
+function openWithRetry(path, baudRate, retries = 3, delayMs = 1000) {
   return new Promise((resolve, reject) => {
     const attempt = (n) => {
       const port = new SerialPort({
@@ -60,7 +62,7 @@ function openWithRetry(path, baudRate, retries = 8, delayMs = 2000) {
         const isRetryable =
           /SetCommState|code 31|access denied|EACCES|port is not open|ERR_INVALID_STATE|ENXIO|cannot open|cannot find the file|device is not connected|not functioning|file not found/i.test(
             err.message,
-          ) || [2, 31, 1167].includes(err.cause?.errno ?? err.errno);
+          ) || UNKNOWN_ERROR.includes(err.cause?.errno ?? err.errno);
         if (n <= 1 || !isRetryable) return reject(err);
         log(
           "warn",
@@ -110,17 +112,18 @@ function probePort(path, baudRate, timeout = 3000) {
           "info",
           `probePort: opened ${path} @ ${baudRate}, waiting for data…`,
         );
-        const parser = port.pipe(new ReadlineParser({ delimiter: "\r\n" }));
+        const parser = port.pipe(new ReadlineParser({ delimiter: "\r" }));
         parser.on("data", (line) => {
+          const trimmed = line.replace(/[\r\n]+$/, "");
           const result =
-            genericParse(line) ||
-            MODEL_PROFILES.reduce((acc, p) => acc || p.parse(line), null);
+            genericParse(trimmed) ||
+            MODEL_PROFILES.reduce((acc, p) => acc || p.parse(trimmed), null);
           if (result) {
             log(
               "info",
-              `probePort: matched ${path} @ ${baudRate} — sample: "${line.trim()}"`,
+              `probePort: matched ${path} @ ${baudRate} — sample: "${trimmed}"`,
             );
-            done(null, { path, baudRate, sample: line.trim() });
+            done(null, { path, baudRate, sample: trimmed });
           }
         });
         port.on("error", (err) => done(err));
@@ -222,7 +225,7 @@ class ScaleReader extends EventEmitter {
           `ScaleReader.connect: port open — ${this.path} @ ${this.baudRate} baud`,
         );
         this._attachListeners(
-          port.pipe(new ReadlineParser({ delimiter: "\r\n" })),
+          port.pipe(new ReadlineParser({ delimiter: "\r" })),
         );
         this.emit("connected", { path: this.path, baudRate: this.baudRate });
       })
@@ -243,10 +246,16 @@ class ScaleReader extends EventEmitter {
   _attachListeners(parser) {
     parser.on("data", (line) => {
       const trimmed = line.trim();
-      log("debug", `ScaleReader: raw signal — "${trimmed}" (hex: ${Buffer.from(line).toString("hex")})`);
+      log(
+        "debug",
+        `ScaleReader: raw signal — "${trimmed}" (hex: ${Buffer.from(line).toString("hex")})`,
+      );
       const data = this._detectModel(trimmed);
       if (data) {
-        log("debug", `ScaleReader: parsed — weight=${data.weight} unit=${data.unit} model=${data.model}`);
+        log(
+          "debug",
+          `ScaleReader: parsed — weight=${data.weight} unit=${data.unit} model=${data.model}`,
+        );
         if (
           this._lastWeight !== null &&
           Math.abs(data.weight - this._lastWeight) < this._weightDelta
@@ -321,7 +330,7 @@ class ScaleReader extends EventEmitter {
         log("info", `ScaleReader: reopened ${this.path} (fast path)`);
         this._port = port;
         this._attachListeners(
-          port.pipe(new ReadlineParser({ delimiter: "\r\n" })),
+          port.pipe(new ReadlineParser({ delimiter: "\r" })),
         );
         this.emit("connected", { path: this.path, baudRate: this.baudRate });
       })
