@@ -10,7 +10,7 @@ npm start
 ## IMPORTANT V:L
 
 **⭐ Nhớ tăng version package mỗi lần publish, để app biết là cần update, hạn chế đổi tên do publish mà đổi tên thì sẽ ra 2 app **
-**⭐ Dùng app trên win thì phải build qua Win, dùng quyền administrator trên Window powershell **
+**⭐ Dùng app trên WIN thì phải build qua Win (do có thư viện Serialport), dùng quyền administrator trên Window powershell **
 | **`npm run publish:winN`** | **⭐ Lệnh publish chính — chạy cả ia32 và x64 song song trên Windows** |
 
 ### Build & Publish
