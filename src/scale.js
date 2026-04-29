@@ -66,6 +66,7 @@ function openWithRetry(path, baudRate, retries = 3, delayMs = 3000) {
         baudRate,
         ...SERIAL_DEFAULTS,
         autoOpen: false,
+        rtscts: false,
       });
       port.open((err) => {
         if (!err) return resolve(port);
