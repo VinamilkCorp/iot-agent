@@ -231,6 +231,9 @@ class ScaleReader extends EventEmitter {
   _detectModel(line) {
     for (const profile of MODEL_PROFILES) {
       const result = profile.parse(line);
+      log("warn", `line ${line}`);
+
+      log("warn", `detectmodal ${JSON.stringify(result)}`);
       if (result) return { model: profile.name, ...result };
     }
     const result = genericParse(line);
