@@ -25,6 +25,13 @@ async function listPorts() {
   return ports;
 }
 
+function parserWeightByteLength(data) {
+  return data
+    ?.toString("utf8")
+    ?.replace(/[\x00-\x1F\x7F-\x9F]/g, "")
+    ?.trim();
+}
+
 // Lọc các cổng có khả năng là cân (dựa trên VID hoặc tên nhà sản xuất)
 async function findScalePorts() {
   const ports = await SerialPort.list();
@@ -52,7 +59,7 @@ const SERIAL_DEFAULTS = {
   stopBits: 1,
   parity: "none",
   hupcl: false,
-  dtr: true
+  dtr: true,
 };
 
 // Mã lỗi có thể thử lại khi mở cổng
@@ -135,13 +142,18 @@ function probePort(path, baudRate, timeout = 3000) {
         );
         // Phân tích dữ liệu nhận được, khớp với profile cân đã biết
         const parser = port.pipe(new ReadlineParser({ delimiter: "\n" }));
-        log('info', `parserparserparserparser ${parser} ${JSON.stringify(parser)}`);
+        log(
+          "info",
+          `parserparserparserparser ${parser} ${JSON.stringify(parser)}`
+        );
         parser.on("data", (line) => {
           log("warn", `DataDataDataData: ${port.read()})`);
           log("warn", `linelineline: ${line} left)`);
           const result =
             genericParse(line) ||
-            MODEL_PROFILES.reduce((acc, p) => acc || p.parse(line), null);
+            MODEL_PROFILES.reduce((acc, p) => acc || p.parse(line), null) ||
+            parserWeightByteLength(line);
+
           log("info", `resultresult: ${result}`);
           if (result) {
             log(
@@ -152,8 +164,11 @@ function probePort(path, baudRate, timeout = 3000) {
           }
         });
         port.on("error", (err) => {
-           log('info', `errerrerrerrerr ${err,message} ${JSON.stringify(err)}`);
-          return done(err)
+          log(
+            "info",
+            `errerrerrerrerr ${(err, message)} ${JSON.stringify(err)}`
+          );
+          return done(err);
         });
       })
       .catch((err) => {
@@ -272,7 +287,8 @@ class ScaleReader extends EventEmitter {
           `ScaleReader.connect: port open — ${this.path} @ ${this.baudRate} baud`
         );
         this._attachListeners(
-          port.pipe(new ReadlineParser({ delimiter: "\r\n" }))
+          // port.pipe(new ReadlineParser({ delimiter: "\r\n" }))
+          port.pipe(new ByteLengthParser({ length: 6 }))
         );
         this.emit("connected", { path: this.path, baudRate: this.baudRate });
       })
@@ -391,9 +407,7 @@ class ScaleReader extends EventEmitter {
         }
         log("info", `ScaleReader: reopened ${this.path} (fast path)`);
         this._port = port;
-        this._attachListeners(
-          port.pipe(new ReadlineParser({ delimiter: "\r\n" }))
-        );
+        this._attachListeners(port.pipe(new ByteLengthParser({ length: 6 })));
         this.emit("connected", { path: this.path, baudRate: this.baudRate });
       })
       .catch(() => {
