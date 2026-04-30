@@ -141,7 +141,7 @@ function probePort(path, baudRate, timeout = 3000) {
           `probePort: opened ${path} @ ${baudRate}, waiting for data…`
         );
         // Phân tích dữ liệu nhận được, khớp với profile cân đã biết
-        const parser = port.pipe(new ReadlineParser({ delimiter: "\n" }));
+        const parser = port.pipe(new ByteLengthParser({ length: 6 }));
         log(
           "info",
           `parserparserparserparser ${parser} ${JSON.stringify(parser)}`
@@ -150,9 +150,9 @@ function probePort(path, baudRate, timeout = 3000) {
           log("warn", `DataDataDataData: ${port.read()})`);
           log("warn", `linelineline: ${line} left)`);
           const result =
+            parserWeightByteLength(line) ||
             genericParse(line) ||
-            MODEL_PROFILES.reduce((acc, p) => acc || p.parse(line), null) ||
-            parserWeightByteLength(line);
+            MODEL_PROFILES.reduce((acc, p) => acc || p.parse(line), null);
 
           log("info", `resultresult: ${result}`);
           if (result) {
@@ -257,7 +257,7 @@ class ScaleReader extends EventEmitter {
       log("warn", `detectmodal ${JSON.stringify(result)}`);
       if (result) return { model: profile.name, ...result };
     }
-    const result = genericParse(line);
+    const result = parserWeightByteLength(line) || genericParse(line);
     return result ? { model: "Generic", ...result } : null;
   }
 
