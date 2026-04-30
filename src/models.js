@@ -15,6 +15,20 @@ const MODEL_PROFILES = [
     },
   },
   {
+    name: "XK31970",
+    baudRate: 9600,
+    // =3.00000
+    parse: (line) => {
+      const m = line.match(/=(\d+\.\d+)/);
+      return m
+        ? {
+            weight: parseFloat(m[1].replace(/\s/g, "")),
+            unit: "kg",
+          }
+        : null;
+    },
+  },
+  {
     name: "XK3190-A9 (Yaohua)",
     baudRate: 9600,
     parse: (line) => {

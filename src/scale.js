@@ -98,6 +98,7 @@ function probePort(path, baudRate, timeout = 3000) {
 
     // Đảm bảo chỉ resolve/reject một lần và dọn dẹp tài nguyên
     const done = (err, result) => {
+      log("done", `probePort Done: ${err} - ${result} `);
       if (settled) return;
       settled = true;
       clearTimeout(timer);
@@ -157,7 +158,7 @@ function probePort(path, baudRate, timeout = 3000) {
 }
 
 // Tự động phát hiện cân bằng cách thử tất cả cổng và baud rate
-async function detectScale(timeout = 2000) {
+async function detectScale(timeout = 10000) {
   const candidates = await findScalePorts();
   if (!candidates.length) {
     const err = new Error(
