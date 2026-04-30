@@ -28,7 +28,13 @@ async function listPorts() {
 }
 
 function parserWeightByteLength(data) {
-  return data?.toString("utf8")?.replace(/[\x00-\x1F\x7F-\x9F]/g, "");
+  return {
+    weight: parseFloat(
+      data?.toString("utf8")?.replace(/[\x00-\x1F\x7F-\x9F]/g, "")
+    ),
+    unit: "kg",
+  };
+  // return data?.toString("utf8")?.replace(/[\x00-\x1F\x7F-\x9F]/g, "");
 }
 
 // Lọc các cổng có khả năng là cân (dựa trên VID hoặc tên nhà sản xuất)
