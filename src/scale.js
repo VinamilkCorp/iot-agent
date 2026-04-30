@@ -196,7 +196,7 @@ async function detectScale(timeout = 10000) {
   );
 
   const results = await Promise.all(probes);
-  log("warn", `resultsresults: ${results} left)`);
+  log("warn", `resultsresults: ${JSON.stringify(results)} left)`);
   const found = results.find(Boolean);
   if (!found) {
     const err = new Error(
