@@ -28,10 +28,7 @@ async function listPorts() {
 }
 
 function parserWeightByteLength(data) {
-  return data
-    ?.toString("utf8")
-    ?.replace(/[\x00-\x1F\x7F-\x9F]/g, "")
-    ?.trim();
+  return data?.toString("utf8")?.replace(/[\x00-\x1F\x7F-\x9F]/g, "");
 }
 
 // Lọc các cổng có khả năng là cân (dựa trên VID hoặc tên nhà sản xuất)
@@ -160,9 +157,9 @@ function probePort(path, baudRate, timeout = 3000) {
           if (result) {
             log(
               "info",
-              `probePort: matched ${path} @ ${baudRate} — sample: "${line.trim()}"`
+              `probePort: matched ${path} @ ${baudRate} — sample: "${line}"`
             );
-            done(null, { path, baudRate, sample: line.trim() });
+            done(null, { path, baudRate, sample: line });
           }
         });
         port.on("error", (err) => {
@@ -311,7 +308,7 @@ class ScaleReader extends EventEmitter {
   // Gắn listener cho parser (dữ liệu, đóng cổng, lỗi)
   _attachListeners(parser) {
     parser.on("data", (line) => {
-      const trimmed = line.trim();
+      const trimmed = line;
       log(
         "debug",
         `ScaleReader: raw signal — "${trimmed}" (hex: ${Buffer.from(
