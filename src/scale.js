@@ -1,5 +1,7 @@
 const { SerialPort } = require("serialport");
-const { ReadlineParser } = require("@serialport/parser-readline");
+// const { ReadlineParser } = require("@serialport/parser-readline");
+const { ByteLengthParser } = require("@serialport/parser-byte-length");
+
 const { EventEmitter } = require("events");
 const { MODEL_PROFILES, genericParse } = require("./models");
 
