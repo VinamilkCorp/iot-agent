@@ -37,10 +37,9 @@ async function findScalePorts() {
   });
   log(
     "info",
-    `findScalePorts: ${candidates.length} candidate(s) — ${
-      candidates
-        .map((p) => `${p.path} [VID:${p.vendorId || "?"}]`)
-        .join(", ") || "none"
+    `findScalePorts: ${candidates.length} candidate(s) — ${candidates
+      .map((p) => `${p.path} [VID:${p.vendorId || "?"}]`)
+      .join(", ") || "none"
     }`
   );
   return candidates;
@@ -68,7 +67,11 @@ function openWithRetry(path, baudRate, retries = 3, delayMs = 3000) {
         autoOpen: false,
       });
       port.open((err) => {
-        console.log("aaaaa", err);
+
+        log(
+          "warn",
+          `aaaaa: ${err} left)`
+        );
         if (!err) return resolve(port);
         port.removeAllListeners();
         const isRetryable =
@@ -78,8 +81,7 @@ function openWithRetry(path, baudRate, retries = 3, delayMs = 3000) {
         if (n <= 1 || !isRetryable) return reject(err);
         log(
           "warn",
-          `openWithRetry: ${err.message} — retrying in ${delayMs}ms… (${
-            n - 1
+          `openWithRetry: ${err.message} — retrying in ${delayMs}ms… (${n - 1
           } left)`
         );
         setTimeout(() => attempt(n - 1), delayMs);
@@ -103,9 +105,13 @@ function probePort(path, baudRate, timeout = 3000) {
       settled = true;
       clearTimeout(timer);
       if (port) {
-        console.log("portportport", port);
+
+        log(
+          "warn",
+          `portportport: ${port} left)`
+        );
         port.removeAllListeners();
-        if (port.isOpen) port.close(() => {});
+        if (port.isOpen) port.close(() => { });
       }
       err ? reject(err) : resolve(result);
     };
@@ -123,7 +129,7 @@ function probePort(path, baudRate, timeout = 3000) {
       .then((openedPort) => {
         if (settled) {
           openedPort.removeAllListeners();
-          openedPort.close(() => {});
+          openedPort.close(() => { });
           return;
         }
         port = openedPort;
@@ -134,10 +140,18 @@ function probePort(path, baudRate, timeout = 3000) {
         // Phân tích dữ liệu nhận được, khớp với profile cân đã biết
         const parser = port.pipe(new ReadlineParser({ delimiter: "\r" }));
         parser.on("data", (line) => {
-          console.log("linelineline", line);
+
+          log(
+            "warn",
+            `linelineline: ${line} left)`
+          );
           const result =
             genericParse(line) ||
             MODEL_PROFILES.reduce((acc, p) => acc || p.parse(line), null);
+          log(
+            "info",
+            `resultresult: ${result}`
+          );
           if (result) {
             log(
               "info",
@@ -162,7 +176,11 @@ function probePort(path, baudRate, timeout = 3000) {
 // Tự động phát hiện cân bằng cách thử tất cả cổng và baud rate
 async function detectScale(timeout = 10000) {
   const candidates = await findScalePorts();
-  console.log("candidatescandidatescandidates", candidates);
+
+  log(
+    "warn",
+    `candidatescandidatescandidates: ${candidates} left)`
+  );
   if (!candidates.length) {
     const err = new Error(
       "detectScale: no USB-serial ports found — check device connection and drivers"
@@ -179,8 +197,7 @@ async function detectScale(timeout = 10000) {
   ];
   log(
     "info",
-    `detectScale: probing ${candidates.length} port(s) × ${
-      baudRates.length
+    `detectScale: probing ${candidates.length} port(s) × ${baudRates.length
     } baud rates: [${baudRates.join(", ")}]`
   );
 
@@ -190,7 +207,10 @@ async function detectScale(timeout = 10000) {
   );
 
   const results = await Promise.all(probes);
-  console.log("resultsresults", results);
+  log(
+    "warn",
+    `resultsresults: ${results} left)`
+  );
   const found = results.find(Boolean);
   if (!found) {
     const err = new Error(
@@ -236,7 +256,7 @@ class ScaleReader extends EventEmitter {
     this._disconnecting = false;
     if (this._port) {
       this._port.removeAllListeners();
-      if (this._port.isOpen) this._port.close(() => {});
+      if (this._port.isOpen) this._port.close(() => { });
       this._port = null;
     }
     log(
@@ -248,7 +268,7 @@ class ScaleReader extends EventEmitter {
       .then((port) => {
         if (this._disconnecting) {
           port.removeAllListeners();
-          port.close(() => {});
+          port.close(() => { });
           return;
         }
         this._port = port;
@@ -319,12 +339,10 @@ class ScaleReader extends EventEmitter {
     this._port.on("error", (err) => {
       log(
         "error",
-        `ScaleReader: port error on ${this.path} — ${err.message} (code:${
-          err.cause?.errno ?? err.errno ?? "?"
-        }${
-          err.cause?.code
-            ? " " + err.cause.code
-            : err.code
+        `ScaleReader: port error on ${this.path} — ${err.message} (code:${err.cause?.errno ?? err.errno ?? "?"
+        }${err.cause?.code
+          ? " " + err.cause.code
+          : err.code
             ? " " + err.code
             : ""
         })`
@@ -371,7 +389,7 @@ class ScaleReader extends EventEmitter {
       .then((port) => {
         if (this._disconnecting) {
           port.removeAllListeners();
-          port.close(() => {});
+          port.close(() => { });
           return;
         }
         log("info", `ScaleReader: reopened ${this.path} (fast path)`);
