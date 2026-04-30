@@ -149,7 +149,7 @@ function probePort(path, baudRate, timeout = 3000) {
           `probePort: opened ${path} @ ${baudRate}, waiting for data…`
         );
         // Phân tích dữ liệu nhận được, khớp với profile cân đã biết
-        const parser = port.pipe(new ByteLengthParser({ length: 10 }));
+        const parser = port.pipe(new ByteLengthParser({ length: 8 }));
         log(
           "info",
           `parserparserparserparser ${parser} ${JSON.stringify(parser)}`
@@ -307,7 +307,7 @@ class ScaleReader extends EventEmitter {
         );
         this._attachListeners(
           // port.pipe(new ReadlineParser({ delimiter: "\r\n" }))
-          port.pipe(new ByteLengthParser({ length: 10 }))
+          port.pipe(new ByteLengthParser({ length: 8 }))
         );
         this.emit("connected", { path: this.path, baudRate: this.baudRate });
       })
@@ -426,7 +426,7 @@ class ScaleReader extends EventEmitter {
         }
         log("info", `ScaleReader: reopened ${this.path} (fast path)`);
         this._port = port;
-        this._attachListeners(port.pipe(new ByteLengthParser({ length: 10 })));
+        this._attachListeners(port.pipe(new ByteLengthParser({ length: 8 })));
         this.emit("connected", { path: this.path, baudRate: this.baudRate });
       })
       .catch(() => {
