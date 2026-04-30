@@ -66,9 +66,9 @@ function openWithRetry(path, baudRate, retries = 3, delayMs = 3000) {
         baudRate,
         ...SERIAL_DEFAULTS,
         autoOpen: false,
-        rtscts: false,
       });
       port.open((err) => {
+        console.log("aaaaa", err);
         if (!err) return resolve(port);
         port.removeAllListeners();
         const isRetryable =
@@ -103,6 +103,7 @@ function probePort(path, baudRate, timeout = 3000) {
       settled = true;
       clearTimeout(timer);
       if (port) {
+        console.log("portportport", port);
         port.removeAllListeners();
         if (port.isOpen) port.close(() => {});
       }
@@ -133,6 +134,7 @@ function probePort(path, baudRate, timeout = 3000) {
         // Phân tích dữ liệu nhận được, khớp với profile cân đã biết
         const parser = port.pipe(new ReadlineParser({ delimiter: "\r" }));
         parser.on("data", (line) => {
+          console.log("linelineline", line);
           const result =
             genericParse(line) ||
             MODEL_PROFILES.reduce((acc, p) => acc || p.parse(line), null);
@@ -160,6 +162,7 @@ function probePort(path, baudRate, timeout = 3000) {
 // Tự động phát hiện cân bằng cách thử tất cả cổng và baud rate
 async function detectScale(timeout = 10000) {
   const candidates = await findScalePorts();
+  console.log("candidatescandidatescandidates", candidates);
   if (!candidates.length) {
     const err = new Error(
       "detectScale: no USB-serial ports found — check device connection and drivers"
@@ -187,6 +190,7 @@ async function detectScale(timeout = 10000) {
   );
 
   const results = await Promise.all(probes);
+  console.log("resultsresults", results);
   const found = results.find(Boolean);
   if (!found) {
     const err = new Error(
