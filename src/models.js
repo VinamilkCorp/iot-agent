@@ -85,4 +85,26 @@ function genericParse(line) {
   return m ? { weight: parseFloat(m[1]), unit: m[2].toLowerCase() } : null;
 }
 
-module.exports = { MODEL_PROFILES, genericParse };
+function fixReversedNumber(str) {
+  const match = str.match(/^=(\d+\.\d+)$/);
+  if (!match) return str;
+
+  // Strip the "=" and remove trailing zeros
+  const raw = match[1].replace(/0+$/, "").replace(/\.$/, "");
+
+  // Reverse all digit characters, keep the dot out
+  const digitsOnly = raw.replace(".", "");
+  const reversed = digitsOnly.split("").reverse().join("");
+
+  // Re-insert decimal point at the mirrored position
+  const originalDecimalPos = raw.indexOf(".");
+  if (originalDecimalPos === -1) return reversed;
+
+  // Decimal was N chars from the left in original → place it N chars from the right
+  const fromRight = raw.length - 1 - originalDecimalPos;
+  const insertAt = fromRight;
+
+  return reversed.slice(0, insertAt) + "." + reversed.slice(insertAt);
+}
+
+module.exports = { MODEL_PROFILES, genericParse, fixReversedNumber };
