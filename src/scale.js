@@ -255,15 +255,15 @@ class ScaleReader extends EventEmitter {
   // Nhận dạng model cân từ dòng dữ liệu thô
   _detectModel(line) {
     let result = {};
-    for (const profile of MODEL_PROFILES && typeof line === "string") {
-      result = profile.parse(line);
-      log("warn", `line ${line}`);
+    if (typeof line === "string") {
+      for (const profile of MODEL_PROFILES) {
+        result = profile.parse(line);
+        log("warn", `line ${line}`);
 
-      log("warn", `detectmodal ${JSON.stringify(result)}`);
-      if (result) return { model: profile.name, ...result };
-    }
-
-    if (typeof line === "object") {
+        log("warn", `detectmodal ${JSON.stringify(result)}`);
+        if (result) return { model: profile.name, ...result };
+      }
+    } else if (typeof line === "object") {
       result = parserWeightByteLength(line);
     } else {
       result = genericParse(line);
