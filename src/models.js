@@ -5,7 +5,7 @@ const MODEL_PROFILES = [
     baudRate: 9600,
     // Phân tích chuỗi dữ liệu dạng "±số đơn_vị"
     parse: (line) => {
-      const m = line.match(/([+-]?\s*\d+\.?\d*)\s*(kg|g|lb)/i);
+      const m = line?.match(/([+-]?\s*\d+\.?\d*)\s*(kg|g|lb)/i);
       return m
         ? {
             weight: parseFloat(m[1].replace(/\s/g, "")),
@@ -19,7 +19,7 @@ const MODEL_PROFILES = [
     baudRate: 9600,
     // =3.00000
     parse: (line) => {
-      const m = line.match(/=(\d+\.\d+)/);
+      const m = line?.match(/=(\d+\.\d+)/);
       return m
         ? {
             weight: parseFloat(m[1].replace(/\s/g, "")),
@@ -32,7 +32,7 @@ const MODEL_PROFILES = [
     name: "XK3190-A9 (Yaohua)",
     baudRate: 9600,
     parse: (line) => {
-      const m = line.match(/([+-]?\s*\d+\.?\d*)\s*(kg|g|lb)/i);
+      const m = line?.match(/([+-]?\s*\d+\.?\d*)\s*(kg|g|lb)/i);
       return m
         ? {
             weight: parseFloat(m[1].replace(/\s/g, "")),
@@ -46,7 +46,7 @@ const MODEL_PROFILES = [
     baudRate: 9600,
     // Format: "=00004.8(kg)"
     parse: (line) => {
-      const m = line.match(/^=([+-]?\d+\.?\d*)\((kg|g|lb)\)/i);
+      const m = line?.match(/^=([+-]?\d+\.?\d*)\((kg|g|lb)\)/i);
       return m ? { weight: parseFloat(m[1]), unit: m[2].toLowerCase() } : null;
     },
   },
@@ -55,7 +55,7 @@ const MODEL_PROFILES = [
     baudRate: 9600,
     // OHAUS continuous: " +0001.234 kg"
     parse: (line) => {
-      const m = line.match(/^\s*([+-]?\d+\.?\d*)\s*(kg|g|lb)/i);
+      const m = line?.match(/^\s*([+-]?\d+\.?\d*)\s*(kg|g|lb)/i);
       return m ? { weight: parseFloat(m[1]), unit: m[2].toLowerCase() } : null;
     },
   },
@@ -64,7 +64,7 @@ const MODEL_PROFILES = [
     baudRate: 9600,
     // MT-SICS: "S S      1.234 kg" or "S D      1.234 kg"
     parse: (line) => {
-      const m = line.match(/^S\s+[SD]\s+([+-]?\d+\.?\d*)\s*(kg|g|lb)/i);
+      const m = line?.match(/^S\s+[SD]\s+([+-]?\d+\.?\d*)\s*(kg|g|lb)/i);
       return m ? { weight: parseFloat(m[1]), unit: m[2].toLowerCase() } : null;
     },
   },
@@ -73,7 +73,7 @@ const MODEL_PROFILES = [
     baudRate: 9600,
     parse: (line) => {
       // MT-SICS: "S S      1.234 kg" or "S D      1.234 kg"
-      const m = line.match(/^S\s+[SD]\s+([+-]?\d+\.?\d*)\s*(kg|g|lb)/i);
+      const m = line?.match(/^S\s+[SD]\s+([+-]?\d+\.?\d*)\s*(kg|g|lb)/i);
       return m ? { weight: parseFloat(m[1]), unit: m[2].toLowerCase() } : null;
     },
   },
@@ -81,7 +81,7 @@ const MODEL_PROFILES = [
 
 // Hàm phân tích chung cho các cân không khớp với profile cụ thể nào
 function genericParse(line) {
-  const m = line.match(/([+-]?\d+\.?\d*)\s*(kg|g|lb)/i);
+  const m = line?.match(/([+-]?\d+\.?\d*)\s*(kg|g|lb)/i);
   return m ? { weight: parseFloat(m[1]), unit: m[2].toLowerCase() } : null;
 }
 

@@ -134,7 +134,7 @@ function probePort(path, baudRate, timeout = 3000) {
           return;
         }
         port = openedPort;
-        log("info", `openWithRetry: ${JSON.stringify(port)} portportport`);
+        // log("info", `openWithRetry: ${JSON.stringify(port)} portportport`);
         log(
           "info",
           `probePort: opened ${path} @ ${baudRate}, waiting for data…`
@@ -146,12 +146,17 @@ function probePort(path, baudRate, timeout = 3000) {
           `parserparserparserparser ${parser} ${JSON.stringify(parser)}`
         );
         parser.on("data", (line) => {
-          log("warn", `DataDataDataData: ${port.read()})`);
-          log("warn", `linelineline: ${line} left)`);
-          const result =
-            parserWeightByteLength(line) ||
-            genericParse(line) ||
-            MODEL_PROFILES.reduce((acc, p) => acc || p.parse(line), null);
+          // log("warn", `DataDataDataData: ${port.read()})`);
+          log(
+            "warn",
+            `linelineline: ${line} left), typeof ${typeof line}, string ${String(
+              line
+            )}`
+          );
+          log("warn", `linetostring: ${line?.toString()}}`);
+          const result = parserWeightByteLength(line);
+          // genericParse(line) ||
+          // MODEL_PROFILES.reduce((acc, p) => acc || p.parse(line), null);
 
           log("info", `resultresult: ${result}`);
           if (result) {
