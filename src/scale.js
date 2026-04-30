@@ -52,6 +52,7 @@ const SERIAL_DEFAULTS = {
   stopBits: 1,
   parity: "none",
   hupcl: false,
+  dtr: true
 };
 
 // Mã lỗi có thể thử lại khi mở cổng
@@ -127,14 +128,16 @@ function probePort(path, baudRate, timeout = 3000) {
           return;
         }
         port = openedPort;
-        log("info", `openWithRetry: ${port}`);
+        log("info", `openWithRetry: ${JSON.stringify(port)} portportport`);
         log(
           "info",
           `probePort: opened ${path} @ ${baudRate}, waiting for data…`
         );
         // Phân tích dữ liệu nhận được, khớp với profile cân đã biết
-        const parser = port.pipe(new ReadlineParser({ delimiter: "\r" }));
+        const parser = port.pipe(new ReadlineParser({ delimiter: "\n" }));
+        log('info', `parserparserparserparser ${parser} ${JSON.stringify(parser)}`);
         parser.on("data", (line) => {
+          log("warn", `DataDataDataData: ${port.read()})`);
           log("warn", `linelineline: ${line} left)`);
           const result =
             genericParse(line) ||
@@ -148,7 +151,10 @@ function probePort(path, baudRate, timeout = 3000) {
             done(null, { path, baudRate, sample: line.trim() });
           }
         });
-        port.on("error", (err) => done(err));
+        port.on("error", (err) => {
+           log('info', `errerrerrerrerr ${err,message} ${JSON.stringify(err)}`);
+          return done(err)
+        });
       })
       .catch((err) => {
         const isCommStateErr = /SetCommState|code 31/i.test(err.message);
