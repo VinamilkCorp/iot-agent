@@ -1,7 +1,9 @@
 const { SerialPort } = require("serialport");
-const { ReadlineParser } = require("@serialport/parser-readline");
+// const { ReadlineParser } = require("@serialport/parser-readline");
+const { ByteLengthParser } = require("@serialport/parser-byte-length");
+
 const { EventEmitter } = require("events");
-const { MODEL_PROFILES, genericParse } = require("./models");
+const { MODEL_PROFILES, genericParse, fixReversedNumber } = require("./models");
 
 // Logger dùng EventEmitter để phát log ra ngoài (main process lắng nghe)
 const logger = new EventEmitter();
@@ -23,6 +25,19 @@ async function listPorts() {
   const ports = await SerialPort.list();
   log("info", `listPorts: found ${ports.length} port(s)`);
   return ports;
+}
+
+function parserWeightByteLength(data) {
+  return {
+    weight: fixReversedNumber(
+      data
+        ?.toString("utf8")
+        ?.replace(/[\x00-\x1F\x7F-\x9F]/g, "")
+        ?.trim()
+    ),
+    unit: "kg",
+  };
+  // return data?.toString("utf8")?.replace(/[\x00-\x1F\x7F-\x9F]/g, "");
 }
 
 // Lọc các cổng có khả năng là cân (dựa trên VID hoặc tên nhà sản xuất)
@@ -52,13 +67,14 @@ const SERIAL_DEFAULTS = {
   stopBits: 1,
   parity: "none",
   hupcl: false,
+  dtr: true,
 };
 
 // Mã lỗi có thể thử lại khi mở cổng
 const UNKNOWN_ERROR = [2, 31, 1167];
 
 // Mở cổng serial với cơ chế thử lại khi gặp lỗi tạm thời
-function openWithRetry(path, baudRate, retries = 3, delayMs = 3000) {
+function openWithRetry(path, baudRate, retries = 3, delayMs = 5000) {
   return new Promise((resolve, reject) => {
     const attempt = (n) => {
       const port = new SerialPort({
@@ -68,7 +84,7 @@ function openWithRetry(path, baudRate, retries = 3, delayMs = 3000) {
         autoOpen: false,
       });
       port.open((err) => {
-        console.log("aaaaa", err);
+        log("warn", `aaaaa: ${err} left)`);
         if (!err) return resolve(port);
         port.removeAllListeners();
         const isRetryable =
@@ -103,7 +119,7 @@ function probePort(path, baudRate, timeout = 3000) {
       settled = true;
       clearTimeout(timer);
       if (port) {
-        console.log("portportport", port);
+        log("warn", `portportport: ${port} left)`);
         port.removeAllListeners();
         if (port.isOpen) port.close(() => {});
       }
@@ -127,26 +143,46 @@ function probePort(path, baudRate, timeout = 3000) {
           return;
         }
         port = openedPort;
+        log("info", `openWithRetry: ${JSON.stringify(port)} portportport`);
         log(
           "info",
           `probePort: opened ${path} @ ${baudRate}, waiting for data…`
         );
         // Phân tích dữ liệu nhận được, khớp với profile cân đã biết
-        const parser = port.pipe(new ReadlineParser({ delimiter: "\r" }));
+        const parser = port.pipe(new ByteLengthParser({ length: 8 }));
+        log(
+          "info",
+          `parserparserparserparser ${parser} ${JSON.stringify(parser)}`
+        );
         parser.on("data", (line) => {
-          console.log("linelineline", line);
-          const result =
-            genericParse(line) ||
-            MODEL_PROFILES.reduce((acc, p) => acc || p.parse(line), null);
+          // log("warn", `DataDataDataData: ${port.read()})`);
+          log(
+            "warn",
+            `linelineline: ${line} left), typeof ${typeof line}, string ${String(
+              line
+            )}`
+          );
+          log("warn", `linetostring: ${line?.toString()}}`);
+          const result = parserWeightByteLength(line);
+          // genericParse(line) ||
+          // MODEL_PROFILES.reduce((acc, p) => acc || p.parse(line), null);
+
+          log("info", `resultresult: ${result}`);
           if (result) {
             log(
               "info",
-              `probePort: matched ${path} @ ${baudRate} — sample: "${line.trim()}"`
+              `probePort: matched ${path} @ ${baudRate} — sample: "${line}"`
             );
-            done(null, { path, baudRate, sample: line.trim() });
+            done(null, { path, baudRate, sample: line });
           }
         });
-        port.on("error", (err) => done(err));
+        port.on("error", (err) => {
+          log(
+            "info",
+            `errerrerrerrerr ${(err, message)} ${JSON.stringify(err)}`
+          );
+          return done(err);
+        });
       })
       .catch((err) => {
         const isCommStateErr = /SetCommState|code 31/i.test(err.message);
@@ -162,7 +198,11 @@ function probePort(path, baudRate, timeout = 3000) {
 // Tự động phát hiện cân bằng cách thử tất cả cổng và baud rate
 async function detectScale(timeout = 10000) {
   const candidates = await findScalePorts();
-  console.log("candidatescandidatescandidates", candidates);
+
+  log(
+    "warn",
+    `candidatescandidatescandidates: ${JSON.stringify(candidates)} left)`
+  );
   if (!candidates.length) {
     const err = new Error(
       "detectScale: no USB-serial ports found — check device connection and drivers"
@@ -190,7 +230,7 @@ async function detectScale(timeout = 10000) {
   );
 
   const results = await Promise.all(probes);
-  console.log("resultsresults", results);
+  log("warn", `resultsresults: ${JSON.stringify(results)} left)`);
   const found = results.find(Boolean);
   if (!found) {
     const err = new Error(
@@ -223,11 +263,20 @@ class ScaleReader extends EventEmitter {
 
   // Nhận dạng model cân từ dòng dữ liệu thô
   _detectModel(line) {
-    for (const profile of MODEL_PROFILES) {
-      const result = profile.parse(line);
-      if (result) return { model: profile.name, ...result };
+    let result = {};
+    if (typeof line === "string") {
+      for (const profile of MODEL_PROFILES) {
+        result = profile.parse(line);
+        log("warn", `line ${line}`);
+
+        log("warn", `detectmodal ${JSON.stringify(result)}`);
+        if (result) return { model: profile.name, ...result };
+      }
+    } else if (typeof line === "object") {
+      result = parserWeightByteLength(line);
+    } else {
+      result = genericParse(line);
     }
-    const result = genericParse(line);
     return result ? { model: "Generic", ...result } : null;
   }
 
@@ -257,7 +306,8 @@ class ScaleReader extends EventEmitter {
           `ScaleReader.connect: port open — ${this.path} @ ${this.baudRate} baud`
         );
         this._attachListeners(
-          port.pipe(new ReadlineParser({ delimiter: "\r\n" }))
+          // port.pipe(new ReadlineParser({ delimiter: "\r\n" }))
+          port.pipe(new ByteLengthParser({ length: 8 }))
         );
         this.emit("connected", { path: this.path, baudRate: this.baudRate });
       })
@@ -278,7 +328,7 @@ class ScaleReader extends EventEmitter {
   // Gắn listener cho parser (dữ liệu, đóng cổng, lỗi)
   _attachListeners(parser) {
     parser.on("data", (line) => {
-      const trimmed = line.trim();
+      const trimmed = line;
       log(
         "debug",
         `ScaleReader: raw signal — "${trimmed}" (hex: ${Buffer.from(
@@ -376,9 +426,7 @@ class ScaleReader extends EventEmitter {
         }
         log("info", `ScaleReader: reopened ${this.path} (fast path)`);
         this._port = port;
-        this._attachListeners(
-          port.pipe(new ReadlineParser({ delimiter: "\r\n" }))
-        );
+        this._attachListeners(port.pipe(new ByteLengthParser({ length: 8 })));
         this.emit("connected", { path: this.path, baudRate: this.baudRate });
       })
       .catch(() => {
@@ -432,7 +480,7 @@ class ScaleReader extends EventEmitter {
 
 // Lớp theo dõi thiết bị mới cắm vào, phát hiện cân khi xuất hiện
 class ScaleWatcher extends EventEmitter {
-  constructor({ pollInterval = 3000, probeTimeout = 2000 } = {}) {
+  constructor({ pollInterval = 5000, probeTimeout = 5000 } = {}) {
     super();
     this._pollInterval = pollInterval;
     this._probeTimeout = probeTimeout;
