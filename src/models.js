@@ -1,3 +1,52 @@
+
+const { EventEmitter } = require("events");
+const { SerialPort } = require("serialport");
+
+const logger = new EventEmitter();
+
+function log(level, msg) {
+  logger.emit("log", { level, msg, ts: new Date().toISOString() });
+}
+
+// Cấu hình mặc định cho cổng serial
+const SERIAL_DEFAULTS = {
+  dataBits: 8,
+  stopBits: 1,
+  parity: "none",
+  hupcl: false
+};
+
+
+// Mở cổng serial với cơ chế thử lại khi gặp lỗi tạm thời
+function openWithRetry(path, baudRate, retries = 3, delayMs = 5000) {
+  return new Promise((resolve, reject) => {
+    const attempt = (n) => {
+      const port = new SerialPort({
+        path,
+        baudRate,
+        ...SERIAL_DEFAULTS,
+        autoOpen: false,
+      });
+      port.open((err) => {
+        if (!err) return resolve(port);
+        port.removeAllListeners();
+        const isRetryable =
+          /SetCommState|code 31|access denied|EACCES|port is not open|ERR_INVALID_STATE|ENXIO|cannot open|cannot find the file|device is not connected|not functioning|file not found/i.test(
+            err.message
+          ) || [2, 31, 1167].includes(err.cause?.errno ?? err.errno);
+        if (n <= 1 || !isRetryable) return reject(err);
+        log(
+          "warn",
+          `openWithRetry: ${err.message} — retrying in ${delayMs}ms… (${n - 1
+          } left)`
+        );
+        setTimeout(() => attempt(n - 1), delayMs);
+      });
+    };
+    attempt(retries);
+  });
+}
+
 // Danh sách profile các model cân được hỗ trợ, mỗi profile có hàm parse riêng
 const MODEL_PROFILES = [
   {
@@ -107,4 +156,4 @@ function fixReversedNumber(str) {
   return reversed.slice(0, insertAt) + "." + reversed.slice(insertAt);
 }
 
-module.exports = { MODEL_PROFILES, genericParse, fixReversedNumber };
+module.exports = { MODEL_PROFILES, genericParse, fixReversedNumber, log, logger, openWithRetry, SERIAL_DEFAULTS };
