@@ -210,6 +210,12 @@ async function initAuth() {
     log.warn("auth env vars missing and AUTH_REQUIRED=false — skipping authentication");
     return onLoginSuccess();
   }
+  if (envMissing && _env.AUTH_REQUIRED) {
+    log.error("auth env vars missing — cannot authenticate");
+    showError("Thiếu cấu hình xác thực (LOGIN_URL, LOGIN_REALM, LOGIN_CLIENT_ID, REDIRECT_URI). Kiểm tra file .env và tải lại.");
+    window.auth.startLogin = () => showError("Thiếu cấu hình .env — không thể đăng nhập");
+    return;
+  }
 
   // Expose hàm đăng nhập cho nút trên trang chủ
   window.auth.startLogin = async () => {
