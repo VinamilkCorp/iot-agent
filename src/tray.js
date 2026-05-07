@@ -3,7 +3,7 @@ const path = require("path");
 const fs = require("fs");
 
 // Tạo icon khay hệ thống với menu ngữ cảnh
-function createTray({ getWin, setIsQuitting, tokensPath, sendError, app, autoUpdater }) {
+function createTray({ getWin, setIsQuitting, tokensPath, sendError, app, autoUpdater, reloadScale }) {
   // Tải và thu nhỏ icon cho khay hệ thống
   const icon = nativeImage
     .createFromPath(path.join(__dirname, "..", "assets", "favicon.png"))
@@ -15,6 +15,16 @@ function createTray({ getWin, setIsQuitting, tokensPath, sendError, app, autoUpd
     Menu.buildFromTemplate([
       // Hiện cửa sổ chính
       { label: "Open", click: () => getWin()?.show() },
+      { type: "separator" },
+      // Kết nối lại cân
+      {
+        label: "Reload scale",
+        click: () => {
+          reloadScale().catch((err) =>
+            sendError(`[reload-scale] ${err?.stack || err}`),
+          );
+        },
+      },
       { type: "separator" },
       // Mở DevTools để debug
       {

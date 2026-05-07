@@ -68,6 +68,7 @@
     "files": [
       "main.js",
       "preload.js",
+      "package.json",
       "renderer/**/*",
       "src/**/*",
       "assets/favicon.png",

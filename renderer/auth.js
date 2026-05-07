@@ -1,6 +1,7 @@
 // ── Trạng thái token trong bộ nhớ ─────────────────────────────────────────────
 let currentTokens = null;
 let _refreshTimer = null;
+let _refreshPromise = null; // Mutex: tránh gửi nhiều refresh request song song
 let _env = null;
 
 const TOKEN_EXPIRY_BUFFER_SEC = 30;
@@ -49,12 +50,21 @@ async function getAccessToken() {
     await window.scale.clearTokens();
     throw new Error("session expired — please log in again");
   }
-  log.info("access token expired — refreshing");
-  const tokens = await refreshTokens(_env, currentTokens.refresh_token);
-  currentTokens = tokens;
-  await window.scale.saveTokens(tokens);
-  scheduleProactiveRefresh();
-  return currentTokens.access_token;
+  // Mutex: nếu đang refresh thì chờ kết quả, không gửi request mới
+  if (_refreshPromise) return _refreshPromise;
+  _refreshPromise = (async () => {
+    log.info("access token expired — refreshing");
+    try {
+      const tokens = await refreshTokens(_env, currentTokens.refresh_token);
+      currentTokens = tokens;
+      await window.scale.saveTokens(tokens);
+      scheduleProactiveRefresh();
+      return currentTokens.access_token;
+    } finally {
+      _refreshPromise = null;
+    }
+  })();
+  return _refreshPromise;
 }
 
 window.auth = { getAccessToken };

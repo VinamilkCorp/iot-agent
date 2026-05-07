@@ -101,7 +101,7 @@ app.whenReady().then(() => {
   });
 
   // Tạo icon khay hệ thống
-  let tray = createTray({
+  createTray({
     getWin,
     getIsQuitting: isQuitting,
     setIsQuitting: (v) => {
@@ -111,6 +111,7 @@ app.whenReady().then(() => {
     sendError,
     app,
     autoUpdater,
+    reloadScale: () => reloadScale(),
   });
 
   // Thiết lập module cập nhật tự động

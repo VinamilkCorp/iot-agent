@@ -265,17 +265,18 @@ class ScaleReader extends EventEmitter {
             this.connect();
           })
           .catch(() => {
-            if (attempts >= 3) {
-              this._startWatcher();
-            } else {
-              this._scheduleReconnect(Math.min(delay * 1.5, 15000), attempts + 1);
+            // Safety net: luôn quay lại reconnect hoặc watcher
+            try {
+              if (attempts >= 3) {
+                this._startWatcher();
+              } else {
+                this._scheduleReconnect(Math.min(delay * 1.5, 15000), attempts + 1);
+              }
+            } catch (e) {
+              log("error", `ScaleReader: unexpected error in _tryReopen — ${e.message}`);
+              this._scheduleReconnect(delay, attempts + 1);
             }
           });
-      })
-      .catch((err) => {
-        // Safety net: đảm bảo không bao giờ die, luôn quay lại reconnect
-        log("error", `ScaleReader: unexpected error in _tryReopen — ${err.message}`);
-        this._scheduleReconnect(delay, attempts + 1);
       });
   }
 
