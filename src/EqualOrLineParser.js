@@ -1,13 +1,19 @@
 const { Transform } = require('stream');
 
 class EqualOrLineParser extends Transform {
-  constructor() {
+  constructor(options = {}) {
     super({ readableObjectMode: true });
     this.buffer = '';
+    this.maxBufferSize = options.maxBufferSize || 4096;
   }
 
   _transform(chunk, encoding, callback) {
     this.buffer += chunk.toString('utf8');
+
+    // Giới hạn buffer để tránh memory leak khi cân gửi dữ liệu liên tục không có delimiter
+    if (this.buffer.length > this.maxBufferSize) {
+      this.buffer = this.buffer.slice(-this.maxBufferSize);
+    }
 
     while (true) {
       // Case 1: message kết thúc bằng xuống dòng

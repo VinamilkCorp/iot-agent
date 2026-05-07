@@ -1,6 +1,7 @@
-const { contextBridge, ipcRenderer, app } = require("electron");
+const { contextBridge, ipcRenderer } = require("electron");
 
-const version = app?.getVersion() ?? "1.0.0";
+// Lấy version từ package.json thay vì app module (không available trong preload)
+const version = require("../package.json").version;
 
 // Expose API an toàn từ main process sang renderer qua contextBridge
 contextBridge.exposeInMainWorld("scale", {

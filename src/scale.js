@@ -77,7 +77,6 @@ function openWithRetry(path, baudRate, retries = 3, delayMs = 3000) {
         autoOpen: false,
       });
       port.open((err) => {
-        console.log("aaaaa", err);
         if (!err) return resolve(port);
         port.removeAllListeners();
         const isRetryable =
@@ -107,12 +106,10 @@ function probePort(path, baudRate, timeout = 3000) {
 
     // Đảm bảo chỉ resolve/reject một lần và dọn dẹp tài nguyên
     const done = (err, result) => {
-      log("done", `probePort Done: ${err} - ${result} `);
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       if (port) {
-        console.log("portportport", port);
         port.removeAllListeners();
         if (port.isOpen) port.close(() => {});
       }
@@ -143,29 +140,26 @@ function probePort(path, baudRate, timeout = 3000) {
         // Phân tích dữ liệu nhận được, khớp với profile cân đã biết
         const parser = port.pipe(new EqualOrLineParser());
         parser.on("data", (line) => {
-          log("warn", `linetostring: ${line?.toString()}}`);
-          let result = {};
-          if (typeof line === "string") {
+          const raw = typeof line === "object" ? line.data : line;
+          let result = null;
+          if (typeof raw === "string") {
             for (const profile of MODEL_PROFILES) {
-              result = profile.parse(line);
-              log("warn", `line ${line}`);
-
-              log("warn", `detectmodal ${JSON.stringify(result)}`);
-              if (result) return { model: profile.name, ...result };
+              result = profile.parse(raw);
+              if (result) break;
             }
-          } else if (typeof line === "object") {
-            result = parserWeightByteLength(line);
+            if (!result) result = genericParse(raw);
+          } else if (typeof raw === "object") {
+            result = parserWeightByteLength(raw);
           } else {
-            result = genericParse(line);
+            result = genericParse(raw);
           }
 
-          log("info", `resultresult: ${result}`);
           if (result) {
             log(
               "info",
-              `probePort: matched ${path} @ ${baudRate} — sample: "${line}"`
+              `probePort: matched ${path} @ ${baudRate} — sample: "${raw}"`
             );
-            done(null, { path, baudRate, sample: line });
+            done(null, { path, baudRate, sample: raw });
           }
         });
         port.on("error", (err) => done(err));
@@ -184,7 +178,6 @@ function probePort(path, baudRate, timeout = 3000) {
 // Tự động phát hiện cân bằng cách thử tất cả cổng và baud rate
 async function detectScale(timeout = 10000) {
   const candidates = await findScalePorts();
-  console.log("candidatescandidatescandidates", candidates);
   if (!candidates.length) {
     const err = new Error(
       "detectScale: no USB-serial ports found — check device connection and drivers"
@@ -212,7 +205,6 @@ async function detectScale(timeout = 10000) {
   );
 
   const results = await Promise.all(probes);
-  console.log("resultsresults", results);
   const found = results.find(Boolean);
   if (!found) {
     const err = new Error(
@@ -245,24 +237,21 @@ class ScaleReader extends EventEmitter {
 
   // Nhận dạng model cân từ dòng dữ liệu thô
   _detectModel(line) {
-    let result = {};
     if (typeof line === "string") {
       for (const profile of MODEL_PROFILES) {
-        result = profile.parse(line);
-        log("warn", `line ${line}`);
-
-        log("warn", `detectmodal ${JSON.stringify(result)}`);
-        if (result) return { model: profile.name, ...result }; 
-        else {
-          return parserWeightByteLength(line);
-        }
+        const result = profile.parse(line);
+        if (result) return { model: profile.name, ...result };
       }
+      // Fallback: thử generic parse hoặc parse raw bytes
+      const generic = genericParse(line);
+      if (generic) return { model: "Generic", ...generic };
+      return parserWeightByteLength(line);
     } else if (typeof line === "object") {
-      result = parserWeightByteLength(line);
+      return parserWeightByteLength(line);
     } else {
-      result = genericParse(line);
+      const result = genericParse(line);
+      return result ? { model: "Generic", ...result } : null;
     }
-    return result ? { model: "Generic", ...result } : null;
   }
 
   // Mở kết nối tới cổng serial của cân

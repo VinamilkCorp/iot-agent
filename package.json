@@ -36,11 +36,7 @@
       "runAfterFinish": true,
       "deleteAppDataOnUninstall": true,
       "perMachine": false,
-      "language": "1066",
-      "include": "build/installer.nsh",
-      "installerLanguages": [
-        "vi_VN"
-      ]
+      "language": "1066"
     },
     "win": {
       "icon": "assets/favicon.png",
