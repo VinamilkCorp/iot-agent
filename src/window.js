@@ -22,6 +22,8 @@ function createWindow(isQuitting) {
     webPreferences: {
       preload: path.join(__dirname, "..", "preload.js"),
       contextIsolation: true,
+      sandbox: false,
+      additionalArguments: [`--app-version=${app.getVersion()}`],
     },
   });
 

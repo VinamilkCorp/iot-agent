@@ -1,7 +1,9 @@
+try {
 const { contextBridge, ipcRenderer } = require("electron");
 
-// Lấy version từ package.json thay vì app module (không available trong preload)
-const version = require("../package.json").version;
+// Lấy version từ additionalArguments (truyền từ main process)
+const versionArg = process.argv.find((a) => a.startsWith("--app-version="));
+const version = versionArg ? versionArg.split("=")[1] : "1.0.0";
 
 // Expose API an toàn từ main process sang renderer qua contextBridge
 contextBridge.exposeInMainWorld("scale", {
@@ -45,3 +47,6 @@ contextBridge.exposeInMainWorld("scale", {
   // Đăng xuất và xoá token
   signOut: () => ipcRenderer.invoke("sign-out"),
 });
+} catch (err) {
+  console.error("[preload] FATAL:", err);
+}
