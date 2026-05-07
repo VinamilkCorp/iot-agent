@@ -3,7 +3,7 @@ const path = require("path");
 const fs = require("fs");
 
 // Tạo icon khay hệ thống với menu ngữ cảnh
-function createTray({ getWin, setIsQuitting, tokensPath, sendError, app }) {
+function createTray({ getWin, setIsQuitting, tokensPath, sendError, app, autoUpdater }) {
   // Tải và thu nhỏ icon cho khay hệ thống
   const icon = nativeImage
     .createFromPath(path.join(__dirname, "..", "assets", "favicon.png"))
@@ -36,6 +36,16 @@ function createTray({ getWin, setIsQuitting, tokensPath, sendError, app }) {
           }
           getWin()?.loadFile("renderer/index.html");
           getWin()?.show();
+        },
+      },
+      { type: "separator" },
+      // Kiểm tra bản cập nhật
+      {
+        label: "Check for updates",
+        click: () => {
+          autoUpdater.checkForUpdates().catch((err) =>
+            sendError(`[check-update] ${err?.stack || err}`),
+          );
         },
       },
       { type: "separator" },

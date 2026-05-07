@@ -97,12 +97,11 @@ app.whenReady().then(() => {
   win = createWindow(isQuitting);
   win.on("close", async () => {
     await _reader?.disconnect();
-    registerExitHooks(_reader);
     _reader = null;
   });
 
   // Tạo icon khay hệ thống
-  tray = createTray({
+  let tray = createTray({
     getWin,
     getIsQuitting: isQuitting,
     setIsQuitting: (v) => {
@@ -111,6 +110,7 @@ app.whenReady().then(() => {
     tokensPath,
     sendError,
     app,
+    autoUpdater,
   });
 
   // Thiết lập module cập nhật tự động

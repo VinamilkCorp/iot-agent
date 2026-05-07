@@ -1,43 +1,51 @@
 const { SerialPort } = require("serialport");
-const { ReadlineParser } = require("@serialport/parser-readline");
-const { ByteLengthParser } = require("@serialport/parser-byte-length");
-const EqualOrLineParser = require('./EqualOrLineParser');
+const EqualOrLineParser = require("./EqualOrLineParser");
 const { EventEmitter } = require("events");
 const { MODEL_PROFILES, genericParse } = require("./models");
 
-// Logger dùng EventEmitter để phát log ra ngoài (main process lắng nghe)
+// ── Logger ──────────────────────────────────────────────────────────────────
 const logger = new EventEmitter();
 function log(level, msg) {
   logger.emit("log", { level, msg, ts: new Date().toISOString() });
 }
 
-function parserWeightByteLength(data) {
-  return {
-    weight: data
-      ?.toString("utf8")
-      ?.replace(/[\x00-\x1F\x7F-\x9F]/g, "")
-      ?.trim(),
-    unit: "kg",
-  };
+// ── Constants ───────────────────────────────────────────────────────────────
+const KNOWN_VIDS = ["0403", "067b", "10c4", "1a86", "0557"];
+const SERIAL_DEFAULTS = { dataBits: 8, stopBits: 1, parity: "none", hupcl: false };
+const RETRYABLE_ERR = /SetCommState|code 31|access denied|EACCES|port is not open|ERR_INVALID_STATE|ENXIO|cannot open|cannot find the file|device is not connected|not functioning|file not found/i;
+const RETRYABLE_ERRNO = [2, 31, 1167];
+const HEALTH_CHECK_INTERVAL_MS = 60_000; // Cảnh báo nếu không nhận weight trong 60s
+
+// ── Weight parsing (shared) ─────────────────────────────────────────────────
+function parseRawBytes(data) {
+  const str = data?.toString("utf8")?.replace(/[\x00-\x1F\x7F-\x9F]/g, "")?.trim();
+  if (!str) return null;
+  const weight = parseFloat(str);
+  return isNaN(weight) ? null : { weight, unit: "kg" };
 }
 
-// Danh sách Vendor ID đã biết của các bộ chuyển đổi USB-Serial phổ biến
-const KNOWN_VIDS = [
-  "0403", // FTDI (most RS232-USB adapters)
-  "067b", // Prolific PL2303
-  "10c4", // Silicon Labs CP210x
-  "1a86", // CH340/CH341 (cheap adapters)
-  "0557", // ATEN
-];
+function parseWeight(line) {
+  if (typeof line === "string") {
+    for (const profile of MODEL_PROFILES) {
+      const result = profile.parse(line);
+      if (result) return { model: profile.name, ...result };
+    }
+    const generic = genericParse(line);
+    if (generic) return { model: "Generic", ...generic };
+    return parseRawBytes(line);
+  }
+  if (typeof line === "object") return parseRawBytes(line);
+  const generic = genericParse(line);
+  return generic ? { model: "Generic", ...generic } : null;
+}
 
-// Liệt kê tất cả cổng serial hiện có trên hệ thống
+// ── Port utilities ──────────────────────────────────────────────────────────
 async function listPorts() {
   const ports = await SerialPort.list();
   log("info", `listPorts: found ${ports.length} port(s)`);
   return ports;
 }
 
-// Lọc các cổng có khả năng là cân (dựa trên VID hoặc tên nhà sản xuất)
 async function findScalePorts() {
   const ports = await SerialPort.list();
   const candidates = ports.filter((p) => {
@@ -47,49 +55,22 @@ async function findScalePorts() {
       /usb|serial|uart|ch34|cp21|pl23|ftdi/i.test(p.manufacturer || "")
     );
   });
-  log(
-    "info",
-    `findScalePorts: ${candidates.length} candidate(s) — ${
-      candidates
-        .map((p) => `${p.path} [VID:${p.vendorId || "?"}]`)
-        .join(", ") || "none"
-    }`
-  );
+  log("info", `findScalePorts: ${candidates.length} candidate(s)`);
   return candidates;
 }
 
-// Cấu hình mặc định cho cổng serial
-const SERIAL_DEFAULTS = {
-  dataBits: 8,
-  stopBits: 1,
-  parity: "none",
-  hupcl: false,
-};
-
-// Mở cổng serial với cơ chế thử lại khi gặp lỗi tạm thời
 function openWithRetry(path, baudRate, retries = 3, delayMs = 3000) {
   return new Promise((resolve, reject) => {
     const attempt = (n) => {
-      const port = new SerialPort({
-        path,
-        baudRate,
-        ...SERIAL_DEFAULTS,
-        autoOpen: false,
-      });
+      const port = new SerialPort({ path, baudRate, ...SERIAL_DEFAULTS, autoOpen: false });
       port.open((err) => {
         if (!err) return resolve(port);
         port.removeAllListeners();
         const isRetryable =
-          /SetCommState|code 31|access denied|EACCES|port is not open|ERR_INVALID_STATE|ENXIO|cannot open|cannot find the file|device is not connected|not functioning|file not found/i.test(
-            err.message
-          ) || [2, 31, 1167].includes(err.cause?.errno ?? err.errno);
+          RETRYABLE_ERR.test(err.message) ||
+          RETRYABLE_ERRNO.includes(err.cause?.errno ?? err.errno);
         if (n <= 1 || !isRetryable) return reject(err);
-        log(
-          "warn",
-          `openWithRetry: ${err.message} — retrying in ${delayMs}ms… (${
-            n - 1
-          } left)`
-        );
+        log("warn", `openWithRetry: ${err.message} — retrying (${n - 1} left)`);
         setTimeout(() => attempt(n - 1), delayMs);
       });
     };
@@ -97,14 +78,13 @@ function openWithRetry(path, baudRate, retries = 3, delayMs = 3000) {
   });
 }
 
-// Thử kết nối và đọc dữ liệu từ một cổng/baud rate cụ thể trong thời gian timeout
+// ── Probe & Detect ──────────────────────────────────────────────────────────
 function probePort(path, baudRate, timeout = 3000) {
-  log("info", `probePort: trying ${path} @ ${baudRate} baud`);
+  log("info", `probePort: trying ${path} @ ${baudRate}`);
   return new Promise((resolve, reject) => {
     let settled = false;
     let port = null;
 
-    // Đảm bảo chỉ resolve/reject một lần và dọn dẹp tài nguyên
     const done = (err, result) => {
       if (settled) return;
       settled = true;
@@ -116,113 +96,56 @@ function probePort(path, baudRate, timeout = 3000) {
       err ? reject(err) : resolve(result);
     };
 
-    // Timeout nếu không nhận được dữ liệu hợp lệ
-    const timer = setTimeout(() => {
-      done(
-        new Error(
-          `probePort timeout: no valid data from ${path} @ ${baudRate} baud after ${timeout}ms`
-        )
-      );
-    }, timeout);
+    const timer = setTimeout(
+      () => done(new Error(`probePort timeout: ${path} @ ${baudRate}`)),
+      timeout,
+    );
 
     openWithRetry(path, baudRate)
       .then((openedPort) => {
-        if (settled) {
-          openedPort.removeAllListeners();
-          openedPort.close(() => {});
-          return;
-        }
+        if (settled) { openedPort.close(() => {}); return; }
         port = openedPort;
-        log(
-          "info",
-          `probePort: opened ${path} @ ${baudRate}, waiting for data…`
-        );
-        // Phân tích dữ liệu nhận được, khớp với profile cân đã biết
         const parser = port.pipe(new EqualOrLineParser());
         parser.on("data", (line) => {
           const raw = typeof line === "object" ? line.data : line;
-          let result = null;
-          if (typeof raw === "string") {
-            for (const profile of MODEL_PROFILES) {
-              result = profile.parse(raw);
-              if (result) break;
-            }
-            if (!result) result = genericParse(raw);
-          } else if (typeof raw === "object") {
-            result = parserWeightByteLength(raw);
-          } else {
-            result = genericParse(raw);
-          }
-
-          if (result) {
-            log(
-              "info",
-              `probePort: matched ${path} @ ${baudRate} — sample: "${raw}"`
-            );
+          if (parseWeight(raw)) {
+            log("info", `probePort: matched ${path} @ ${baudRate}`);
             done(null, { path, baudRate, sample: raw });
           }
         });
         port.on("error", (err) => done(err));
       })
-      .catch((err) => {
-        const isCommStateErr = /SetCommState|code 31/i.test(err.message);
-        log(
-          isCommStateErr ? "warn" : "error",
-          `probePort: failed to open ${path} @ ${baudRate} — ${err.message}`
-        );
-        done(err);
-      });
+      .catch((err) => done(err));
   });
 }
 
-// Tự động phát hiện cân bằng cách thử tất cả cổng và baud rate
 async function detectScale(timeout = 10000) {
   const candidates = await findScalePorts();
   if (!candidates.length) {
-    const err = new Error(
-      "detectScale: no USB-serial ports found — check device connection and drivers"
+    throw Object.assign(
+      new Error("detectScale: no USB-serial ports found"),
+      { logged: (log("error", "detectScale: no USB-serial ports found"), true) },
     );
-    log("error", err.message);
-    throw err;
   }
 
-  // Tổng hợp tất cả baud rate từ profile + các giá trị phổ biến
-  const baudRates = [
-    ...new Set(MODEL_PROFILES.map((p) => p.baudRate)),
-    // 4800,
-    // 19200,
-  ];
-  log(
-    "info",
-    `detectScale: probing ${candidates.length} port(s) × ${
-      baudRates.length
-    } baud rates: [${baudRates.join(", ")}]`
-  );
+  const baudRates = [...new Set(MODEL_PROFILES.map((p) => p.baudRate))];
+  log("info", `detectScale: probing ${candidates.length} port(s) × ${baudRates.length} baud`);
 
-  // Thử song song tất cả tổ hợp cổng × baud rate
   const probes = candidates.flatMap((c) =>
-    baudRates.map((b) => probePort(c.path, b, timeout).catch(() => null))
+    baudRates.map((b) => probePort(c.path, b, timeout).catch(() => null)),
   );
+  const found = (await Promise.all(probes)).find(Boolean);
 
-  const results = await Promise.all(probes);
-  const found = results.find(Boolean);
   if (!found) {
-    const err = new Error(
-      `detectScale: scale not responding on any candidate port [${candidates
-        .map((c) => c.path)
-        .join(", ")}]`
-    );
-    log("error", err.message);
-    throw err;
+    const msg = `detectScale: no response on [${candidates.map((c) => c.path).join(", ")}]`;
+    log("error", msg);
+    throw new Error(msg);
   }
-  log(
-    "info",
-    `detectScale: scale detected — ${found.path} @ ${found.baudRate} baud`
-  );
+  log("info", `detectScale: found ${found.path} @ ${found.baudRate}`);
   return found;
 }
 
-// Lớp đọc dữ liệu từ cân, tự động kết nối lại khi mất kết nối
+// ── ScaleReader ─────────────────────────────────────────────────────────────
 class ScaleReader extends EventEmitter {
   constructor({ path, baudRate = 9600, weightDelta = 0.01 } = {}) {
     super();
@@ -230,184 +153,111 @@ class ScaleReader extends EventEmitter {
     this.baudRate = baudRate;
     this._weightDelta = weightDelta;
     this._lastWeight = null;
+    this._lastWeightTime = null;
     this._port = null;
     this._reconnectTimer = null;
+    this._healthTimer = null;
     this._watcherActive = false;
+    this._disconnecting = false;
   }
 
-  // Nhận dạng model cân từ dòng dữ liệu thô
-  _detectModel(line) {
-    if (typeof line === "string") {
-      for (const profile of MODEL_PROFILES) {
-        const result = profile.parse(line);
-        if (result) return { model: profile.name, ...result };
-      }
-      // Fallback: thử generic parse hoặc parse raw bytes
-      const generic = genericParse(line);
-      if (generic) return { model: "Generic", ...generic };
-      return parserWeightByteLength(line);
-    } else if (typeof line === "object") {
-      return parserWeightByteLength(line);
-    } else {
-      const result = genericParse(line);
-      return result ? { model: "Generic", ...result } : null;
-    }
-  }
-
-  // Mở kết nối tới cổng serial của cân
   connect() {
     this._disconnecting = false;
-    if (this._port) {
-      this._port.removeAllListeners();
-      if (this._port.isOpen) this._port.close(() => {});
-      this._port = null;
-    }
-    log(
-      "info",
-      `ScaleReader.connect: opening ${this.path} @ ${this.baudRate} baud`
-    );
+    this._closePort();
+    log("info", `ScaleReader: opening ${this.path} @ ${this.baudRate}`);
 
     openWithRetry(this.path, this.baudRate)
       .then((port) => {
-        if (this._disconnecting) {
-          port.removeAllListeners();
-          port.close(() => {});
-          return;
-        }
+        if (this._disconnecting) { port.close(() => {}); return; }
         this._port = port;
-        log(
-          "info",
-          `ScaleReader.connect: port open — ${this.path} @ ${this.baudRate} baud`
-        );
-        this._attachListeners(
-          port.pipe(new EqualOrLineParser())
-        );
+        this._attachListeners(port.pipe(new EqualOrLineParser()));
+        this._startHealthCheck();
         this.emit("connected", { path: this.path, baudRate: this.baudRate });
       })
       .catch((err) => {
-        const isCommStateErr = /SetCommState|code 31/i.test(err.message);
-        const detail = isCommStateErr
-          ? `${err.message} — Windows driver rejected settings for ${this.path}, will retry`
-          : `${err.message} (code:${err.cause?.errno ?? err.errno ?? "?"})`;
-        log(
-          isCommStateErr ? "warn" : "error",
-          `ScaleReader.connect: failed to open ${this.path} — ${detail}`
-        );
-        this.emit("error", Object.assign(err, { detail }));
+        log("error", `ScaleReader: open failed — ${err.message}`);
+        this.emit("error", err);
         this._scheduleReconnect();
       });
   }
 
-  // Gắn listener cho parser (dữ liệu, đóng cổng, lỗi)
+  _startHealthCheck() {
+    clearInterval(this._healthTimer);
+    this._healthTimer = setInterval(() => {
+      if (!this._lastWeightTime) {
+        log("warn", `ScaleReader: no weight received since connect — port ${this.path}`);
+        return;
+      }
+      const silentMs = Date.now() - this._lastWeightTime;
+      if (silentMs > HEALTH_CHECK_INTERVAL_MS) {
+        log("warn", `ScaleReader: no weight for ${Math.round(silentMs / 1000)}s — port ${this.path} may be unresponsive`);
+      }
+    }, HEALTH_CHECK_INTERVAL_MS);
+  }
+
+  _stopHealthCheck() {
+    clearInterval(this._healthTimer);
+    this._healthTimer = null;
+  }
+
   _attachListeners(parser) {
     parser.on("data", (line) => {
-       log(
-        "debug",
-        `ScaleReader: raw signal — ${line}`
-      );
-      const trimmed = line;
-      log(
-        "debug",
-        `ScaleReader: raw signal — "${trimmed.data}" - ${JSON.stringify(trimmed)}`
-      );
-      const data = this._detectModel(trimmed.data);
-      if (data) {
-        log(
-          "debug",
-          `ScaleReader: parsed — weight=${data.weight} unit=${data.unit} model=${data.model}`
-        );
-        // Bỏ qua nếu thay đổi cân nặng nhỏ hơn ngưỡng
-        if (
-          this._lastWeight !== null &&
-          Math.abs(data.weight - this._lastWeight) < this._weightDelta
-        )
-          return;
-        this._lastWeight = data.weight;
-        log(
-          "info",
-          `ScaleReader: weight=${data.weight} ${data.unit} model=${data.model} raw="${trimmed}"`
-        );
-        this.emit("weight", data);
-      } else {
-        log("warn", `ScaleReader: unrecognised line — "${trimmed}"`);
-        this.emit("raw", trimmed);
+      const raw = typeof line === "object" ? line.data : line;
+      const data = parseWeight(raw);
+      if (!data) {
+        log("debug", `ScaleReader: unparseable data — "${raw}"`);
+        this.emit("raw", raw);
+        return;
       }
+      // Bỏ qua thay đổi nhỏ hơn ngưỡng (chống nhiễu)
+      if (
+        this._lastWeight !== null &&
+        Math.abs(data.weight - this._lastWeight) < this._weightDelta
+      ) return;
+      this._lastWeight = data.weight;
+      this._lastWeightTime = Date.now();
+      log("info", `ScaleReader: ${data.weight} ${data.unit} [${data.model}]`);
+      this.emit("weight", data);
     });
 
-    // Lên lịch kết nối lại khi cổng bị đóng bất ngờ
     this._port.on("close", () => {
       log("warn", `ScaleReader: port closed — ${this.path}`);
+      this._stopHealthCheck();
       this.emit("disconnected");
       if (!this._disconnecting) this._scheduleReconnect();
     });
 
     this._port.on("error", (err) => {
-      log(
-        "error",
-        `ScaleReader: port error on ${this.path} — ${err.message} (code:${
-          err.cause?.errno ?? err.errno ?? "?"
-        }${
-          err.cause?.code
-            ? " " + err.cause.code
-            : err.code
-            ? " " + err.code
-            : ""
-        })`
-      );
+      log("error", `ScaleReader: port error — ${err.message}`);
+      this._stopHealthCheck();
       this.emit("error", err);
       this._scheduleReconnect();
     });
   }
 
-  // Lên lịch thử kết nối lại sau một khoảng thời gian
   _scheduleReconnect(delay = 5000, attempts = 0) {
     if (this._watcherActive || this._disconnecting) return;
-    log(
-      "info",
-      `ScaleReader: reconnecting in ${delay}ms… (attempt ${attempts + 1})`
-    );
+    log("info", `ScaleReader: reconnect in ${delay}ms (attempt ${attempts + 1})`);
     clearTimeout(this._reconnectTimer);
     this._reconnectTimer = setTimeout(() => {
       if (this._disconnecting) return;
-      // Đảm bảo cổng cũ được giải phóng hoàn toàn trước khi mở lại
-      const cleanup = () => {
-        if (this._port) {
-          this._port.removeAllListeners();
-          this._port = null;
-        }
-      };
-      if (this._port && this._port.isOpen) {
-        this._port.close(() => {
-          cleanup();
-          this._tryReopen(delay, attempts);
-        });
-      } else {
-        cleanup();
-        this._tryReopen(delay, attempts);
-      }
+      this._closePort();
+      this._tryReopen(delay, attempts);
     }, delay);
   }
 
-  // Thử mở lại cổng cũ, nếu thất bại thì phát hiện lại cân
   _tryReopen(delay, attempts) {
     if (this._disconnecting) return;
-    // Thử nhanh: mở lại cùng cổng
     openWithRetry(this.path, this.baudRate)
       .then((port) => {
-        if (this._disconnecting) {
-          port.removeAllListeners();
-          port.close(() => {});
-          return;
-        }
-        log("info", `ScaleReader: reopened ${this.path} (fast path)`);
+        if (this._disconnecting) { port.close(() => {}); return; }
+        log("info", `ScaleReader: reopened ${this.path}`);
         this._port = port;
-        this._attachListeners(
-          port.pipe(new EqualOrLineParser())
-        );
+        this._attachListeners(port.pipe(new EqualOrLineParser()));
+        this._startHealthCheck();
         this.emit("connected", { path: this.path, baudRate: this.baudRate });
       })
       .catch(() => {
-        // Dự phòng: phát hiện lại cân (Windows có thể đổi số COM port)
         detectScale()
           .then(({ path, baudRate }) => {
             this.path = path;
@@ -415,47 +265,53 @@ class ScaleReader extends EventEmitter {
             this.connect();
           })
           .catch(() => {
-            // Sau nhiều lần thất bại, chuyển sang chế độ watcher
             if (attempts >= 3) {
-              log(
-                "info",
-                "ScaleReader: switching to watcher mode — waiting for device plug-in…"
-              );
-              this._watcherActive = true;
-              const watcher = new ScaleWatcher();
-              watcher.once("scaleFound", ({ path, baudRate }) => {
-                watcher.stop();
-                this._watcherActive = false;
-                this.path = path;
-                this.baudRate = baudRate;
-                this.connect();
-              });
-              watcher.start();
+              this._startWatcher();
             } else {
-              this._scheduleReconnect(
-                Math.min(delay * 1.5, 15000),
-                attempts + 1
-              );
+              this._scheduleReconnect(Math.min(delay * 1.5, 15000), attempts + 1);
             }
           });
+      })
+      .catch((err) => {
+        // Safety net: đảm bảo không bao giờ die, luôn quay lại reconnect
+        log("error", `ScaleReader: unexpected error in _tryReopen — ${err.message}`);
+        this._scheduleReconnect(delay, attempts + 1);
       });
   }
 
-  // Ngắt kết nối và dừng mọi timer
-  disconnect() {
-    log("info", `ScaleReader.disconnect: closing ${this.path}`);
-    this._disconnecting = true;
-    clearTimeout(this._reconnectTimer);
-    return new Promise((resolve) => {
-      if (!this._port || !this._port.isOpen) return resolve();
-      this._port.close(() => resolve());
-    }).catch((reason) => {
-      log("error", `Disconnecting reader from ${reason}`);
+  _startWatcher() {
+    log("info", "ScaleReader: switching to watcher mode — will keep polling until scale found");
+    this._watcherActive = true;
+    const watcher = new ScaleWatcher();
+    watcher.once("scaleFound", ({ path, baudRate }) => {
+      watcher.stop();
+      this._watcherActive = false;
+      this.path = path;
+      this.baudRate = baudRate;
+      log("info", `ScaleReader: watcher found scale at ${path} @ ${baudRate}`);
+      this.connect();
     });
+    watcher.start();
+  }
+
+  _closePort() {
+    if (!this._port) return;
+    this._port.removeAllListeners();
+    if (this._port.isOpen) this._port.close(() => {});
+    this._port = null;
+  }
+
+  async disconnect() {
+    log("info", `ScaleReader: disconnecting ${this.path}`);
+    this._disconnecting = true;
+    this._stopHealthCheck();
+    clearTimeout(this._reconnectTimer);
+    if (!this._port?.isOpen) return;
+    return new Promise((resolve) => this._port.close(() => resolve()));
   }
 }
 
-// Lớp theo dõi thiết bị mới cắm vào, phát hiện cân khi xuất hiện
+// ── ScaleWatcher ────────────────────────────────────────────────────────────
 class ScaleWatcher extends EventEmitter {
   constructor({ pollInterval = 3000, probeTimeout = 2000 } = {}) {
     super();
@@ -465,57 +321,38 @@ class ScaleWatcher extends EventEmitter {
     this._timer = null;
   }
 
-  start() {
-    this._poll();
-    return this;
-  }
+  start() { this._poll(); return this; }
+  stop() { clearTimeout(this._timer); }
 
-  stop() {
-    clearTimeout(this._timer);
-  }
-
-  // Kiểm tra định kỳ các cổng mới xuất hiện
   async _poll() {
     try {
       const candidates = await findScalePorts();
       const newPorts = candidates.filter((c) => !this._knownPaths.has(c.path));
-
-      // Thử phát hiện cân trên các cổng mới
-      for (const candidate of newPorts) {
-        this._knownPaths.add(candidate.path);
+      for (const c of newPorts) {
+        this._knownPaths.add(c.path);
         detectScale(this._probeTimeout)
           .then((detected) => this.emit("scaleFound", detected))
-          .catch(() => this._knownPaths.delete(candidate.path));
+          .catch(() => this._knownPaths.delete(c.path));
       }
-
-      // Xoá các cổng đã bị rút khỏi danh sách theo dõi
-      const currentPaths = new Set(candidates.map((c) => c.path));
+      // Xoá cổng đã rút
+      const current = new Set(candidates.map((c) => c.path));
       for (const p of this._knownPaths) {
-        if (!currentPaths.has(p)) this._knownPaths.delete(p);
+        if (!current.has(p)) this._knownPaths.delete(p);
       }
-    } catch {
-      /* ignore poll errors */
-    }
-
+    } catch { /* ignore */ }
     this._timer = setTimeout(() => this._poll(), this._pollInterval);
   }
 }
 
-// Tự động phát hiện và kết nối cân, nếu chưa có thì chờ thiết bị cắm vào
+// ── Auto-connect ────────────────────────────────────────────────────────────
 async function autoConnect(options = {}) {
-  log("info", "autoConnect: starting…");
+  log("info", "autoConnect: starting");
   return new Promise((resolve) => {
     const tryConnect = (detected) => {
-      log(
-        "info",
-        `autoConnect: connecting to ${detected.path} @ ${detected.baudRate} baud`
-      );
       const reader = new ScaleReader({
         path: detected.path,
         baudRate: detected.baudRate,
-        ...(options.weightDelta !== undefined && {
-          weightDelta: options.weightDelta,
-        }),
+        ...(options.weightDelta !== undefined && { weightDelta: options.weightDelta }),
       });
       reader.connect();
       resolve(reader);
@@ -524,29 +361,31 @@ async function autoConnect(options = {}) {
     detectScale(options.probeTimeout)
       .then(tryConnect)
       .catch((err) => {
-        log(
-          "warn",
-          `autoConnect: initial detect failed (${err.message}) — watching for device…`
-        );
-        // Chờ thiết bị được cắm vào rồi kết nối
+        log("warn", `autoConnect: detect failed (${err.message}) — watching`);
         const watcher = new ScaleWatcher(options);
-        watcher.once("scaleFound", (detected) => {
-          watcher.stop();
-          tryConnect(detected);
-        });
+        watcher.once("scaleFound", (detected) => { watcher.stop(); tryConnect(detected); });
         watcher.start();
       });
   });
 }
 
-// Đăng ký hook dọn dẹp khi process thoát
+// ── Exit hooks ──────────────────────────────────────────────────────────────
+let _exitCleanup = null;
 function registerExitHooks(reader) {
-  const cleanup = () => reader.disconnect();
-  process.once("exit", cleanup);
-  process.once("SIGINT", () => reader.disconnect().then(() => process.exit(0)));
-  process.once("SIGTERM", () =>
-    reader.disconnect().then(() => process.exit(0))
-  );
+  // Xoá listener cũ trước khi gắn mới (tránh tích luỹ)
+  if (_exitCleanup) {
+    process.removeListener("exit", _exitCleanup.exit);
+    process.removeListener("SIGINT", _exitCleanup.sigint);
+    process.removeListener("SIGTERM", _exitCleanup.sigterm);
+  }
+  if (!reader) { _exitCleanup = null; return; }
+  const exit = () => reader.disconnect();
+  const sigint = () => reader.disconnect().then(() => process.exit(0));
+  const sigterm = () => reader.disconnect().then(() => process.exit(0));
+  _exitCleanup = { exit, sigint, sigterm };
+  process.once("exit", exit);
+  process.once("SIGINT", sigint);
+  process.once("SIGTERM", sigterm);
 }
 
 module.exports = {
