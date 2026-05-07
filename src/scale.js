@@ -147,13 +147,12 @@ async function detectScale(timeout = 10000) {
 
 // ── Reverse detection ────────────────────────────────────────────────────────
 const REVERSE_DETECT_SAMPLES = 5;
+const REVERSE_WINDOW_SIZE = 10; // Sliding window để re-evaluate liên tục
 
 function reverseNumStr(str) {
-  // "1.4" → "4.1", "00.52" → "25.00"
   const cleaned = str.replace(/[^0-9.+-]/g, "");
   const sign = cleaned.startsWith("-") || cleaned.startsWith("+") ? cleaned[0] : "";
   const digits = cleaned.replace(/^[+-]/, "");
-  // Đảo toàn bộ ký tự (giữ dấu chấm ở vị trí tương đối)
   const dotIdx = digits.indexOf(".");
   const raw = digits.replace(".", "");
   const reversed = raw.split("").reverse().join("");
@@ -184,6 +183,7 @@ class ScaleReader extends EventEmitter {
     this._disconnecting = false;
     this._reversed = null; // null = chưa detect, true/false = đã xác định
     this._detectSamples = []; // samples để detect reverse
+    this._recentWeights = []; // sliding window để re-evaluate
   }
 
   connect() {
@@ -237,21 +237,13 @@ class ScaleReader extends EventEmitter {
 
       // Auto-detect reverse: thu thập samples rồi so sánh variance
       if (this._reversed === null) {
-        this._detectSamples.push({ normal: data.weight, raw });
+        this._detectSamples.push(data.weight);
         if (this._detectSamples.length < REVERSE_DETECT_SAMPLES) return;
-        // Tính variance cho cả 2 chiều
-        const normals = this._detectSamples.map((s) => s.normal);
-        const reverseds = this._detectSamples.map((s) => {
-          const revStr = reverseNumStr(String(s.normal));
-          return parseFloat(revStr) || 0;
-        });
-        const varNormal = variance(normals);
-        const varReversed = variance(reverseds);
-        this._reversed = varReversed < varNormal;
-        log("info", `ScaleReader: reverse detection — normal_var=${varNormal.toFixed(4)} reversed_var=${varReversed.toFixed(4)} → ${this._reversed ? "REVERSED" : "NORMAL"}`);
+        this._reversed = this._evaluateReverse(this._detectSamples);
+        log("info", `ScaleReader: initial reverse detection → ${this._reversed ? "REVERSED" : "NORMAL"}`);
         // Emit các samples đã buffer
-        for (const s of this._detectSamples) {
-          this._emitWeight(s.normal, data.unit, data.model);
+        for (const w of this._detectSamples) {
+          this._emitWeight(w, data.unit, data.model);
         }
         this._detectSamples = [];
         return;
@@ -275,12 +267,39 @@ class ScaleReader extends EventEmitter {
     });
   }
 
+  _evaluateReverse(samples) {
+    const normals = samples;
+    const reverseds = samples.map((w) => parseFloat(reverseNumStr(String(w))) || 0);
+    const varNormal = variance(normals);
+    const varReversed = variance(reverseds);
+    log("debug", `ScaleReader: reverse eval — normal_var=${varNormal.toFixed(4)} reversed_var=${varReversed.toFixed(4)}`);
+    return varReversed < varNormal;
+  }
+
   _emitWeight(weight, unit, model) {
     let finalWeight = weight;
     if (this._reversed) {
       const revStr = reverseNumStr(String(weight));
       finalWeight = parseFloat(revStr) || weight;
     }
+
+    // Sliding window: re-evaluate reverse liên tục
+    this._recentWeights.push(weight);
+    if (this._recentWeights.length > REVERSE_WINDOW_SIZE) {
+      this._recentWeights.shift();
+    }
+    if (this._recentWeights.length === REVERSE_WINDOW_SIZE) {
+      const shouldReverse = this._evaluateReverse(this._recentWeights);
+      if (shouldReverse !== this._reversed) {
+        log("warn", `ScaleReader: reverse flipped → ${shouldReverse ? "REVERSED" : "NORMAL"}`);
+        this._reversed = shouldReverse;
+        // Recalculate finalWeight với setting mới
+        finalWeight = this._reversed
+          ? (parseFloat(reverseNumStr(String(weight))) || weight)
+          : weight;
+      }
+    }
+
     // Bỏ qua thay đổi nhỏ hơn ngưỡng (chống nhiễu)
     if (
       this._lastWeight !== null &&
