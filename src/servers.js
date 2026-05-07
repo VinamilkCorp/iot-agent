@@ -119,4 +119,4 @@ function startAuthServer({ getAuthWin, setAuthWin, getWin, sendError }) {
   return authServer;
 }
 
-module.exports = { startSseServer, startAuthServer, sseEmit, setScaleConnected, updateScaleState };
+module.exports = { startSseServer, startAuthServer, sseEmit, setScaleConnected, updateScaleState, getScaleState: () => scaleState };

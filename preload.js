@@ -16,6 +16,8 @@ contextBridge.exposeInMainWorld("scale", {
   listPorts: () => ipcRenderer.invoke("list-ports"),
   // Lấy danh sách cổng có khả năng là cân
   listScalePorts: () => ipcRenderer.invoke("list-scale-ports"),
+  // Lấy trạng thái hiện tại của cân
+  getScaleState: () => ipcRenderer.invoke("get-scale-state"),
   // Lấy biến môi trường cần thiết cho renderer
   getEnv: () => ipcRenderer.invoke("get-env"),
   // Lắng nghe callback xác thực OAuth

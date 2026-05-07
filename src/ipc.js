@@ -3,6 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const { listPorts, findScalePorts } = require("./scale");
 const { AUTH_REQUIRED } = require("./window");
+const { getScaleState } = require("./servers");
 
 // Trả về đường dẫn file lưu token đã mã hoá
 function tokensPath() {
@@ -48,6 +49,8 @@ function registerIpcHandlers({
   ipcMain.handle("list-ports", () => listPorts());
   // Lấy danh sách cổng có khả năng là cân
   ipcMain.handle("list-scale-ports", () => findScalePorts());
+  // Lấy trạng thái hiện tại của cân
+  ipcMain.handle("get-scale-state", () => getScaleState());
   // Trả về biến môi trường cần thiết cho renderer
   ipcMain.handle("get-env", () => ({
     LOGIN_URL: process.env.LOGIN_URL,

@@ -74,3 +74,14 @@ async function loadScalePorts() {
 
 loadPorts();
 loadScalePorts();
+
+// Đồng bộ trạng thái cân khi renderer load (sau reload/login)
+window.scale.getScaleState().then((state) => {
+  if (state?.connected) {
+    setScaleStatus("green", "Scale connected", `${state.path} @ ${state.baudRate} baud`);
+    if (state.weight != null) {
+      document.getElementById("weight-val").textContent = state.weight;
+      document.getElementById("weight-unit").textContent = state.unit || "";
+    }
+  }
+});
