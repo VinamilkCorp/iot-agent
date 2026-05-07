@@ -145,28 +145,6 @@ async function detectScale(timeout = 10000) {
   return found;
 }
 
-// ── Reverse detection ────────────────────────────────────────────────────────
-const REVERSE_DETECT_SAMPLES = 5;
-const REVERSE_WINDOW_SIZE = 10; // Sliding window để re-evaluate liên tục
-
-function reverseNumStr(str) {
-  const cleaned = str.replace(/[^0-9.+-]/g, "");
-  const sign = cleaned.startsWith("-") || cleaned.startsWith("+") ? cleaned[0] : "";
-  const digits = cleaned.replace(/^[+-]/, "");
-  const dotIdx = digits.indexOf(".");
-  const raw = digits.replace(".", "");
-  const reversed = raw.split("").reverse().join("");
-  if (dotIdx === -1) return sign + reversed;
-  const newDotPos = raw.length - dotIdx;
-  return sign + reversed.slice(0, newDotPos) + "." + reversed.slice(newDotPos);
-}
-
-function variance(arr) {
-  if (arr.length < 2) return Infinity;
-  const mean = arr.reduce((a, b) => a + b, 0) / arr.length;
-  return arr.reduce((sum, v) => sum + (v - mean) ** 2, 0) / arr.length;
-}
-
 // ── ScaleReader ─────────────────────────────────────────────────────────────
 class ScaleReader extends EventEmitter {
   constructor({ path, baudRate = 9600, weightDelta = 0.01 } = {}) {
@@ -181,9 +159,6 @@ class ScaleReader extends EventEmitter {
     this._healthTimer = null;
     this._watcherActive = false;
     this._disconnecting = false;
-    this._reversed = null; // null = chưa detect, true/false = đã xác định
-    this._detectSamples = []; // samples để detect reverse
-    this._recentWeights = []; // sliding window để re-evaluate
   }
 
   connect() {
@@ -234,22 +209,15 @@ class ScaleReader extends EventEmitter {
         this.emit("raw", raw);
         return;
       }
-
-      // Auto-detect reverse: thu thập samples rồi so sánh variance
-      if (this._reversed === null) {
-        this._detectSamples.push(data.weight);
-        if (this._detectSamples.length < REVERSE_DETECT_SAMPLES) return;
-        this._reversed = this._evaluateReverse(this._detectSamples);
-        log("info", `ScaleReader: initial reverse detection → ${this._reversed ? "REVERSED" : "NORMAL"}`);
-        // Emit các samples đã buffer
-        for (const w of this._detectSamples) {
-          this._emitWeight(w, data.unit, data.model);
-        }
-        this._detectSamples = [];
-        return;
-      }
-
-      this._emitWeight(data.weight, data.unit, data.model);
+      // Bỏ qua thay đổi nhỏ hơn ngưỡng (chống nhiễu)
+      if (
+        this._lastWeight !== null &&
+        Math.abs(data.weight - this._lastWeight) < this._weightDelta
+      ) return;
+      this._lastWeight = data.weight;
+      this._lastWeightTime = Date.now();
+      log("info", `ScaleReader: ${data.weight} ${data.unit} [${data.model}]`);
+      this.emit("weight", data);
     });
 
     this._port.on("close", () => {
@@ -265,50 +233,6 @@ class ScaleReader extends EventEmitter {
       this.emit("error", err);
       this._scheduleReconnect();
     });
-  }
-
-  _evaluateReverse(samples) {
-    const normals = samples;
-    const reverseds = samples.map((w) => parseFloat(reverseNumStr(String(w))) || 0);
-    const varNormal = variance(normals);
-    const varReversed = variance(reverseds);
-    log("debug", `ScaleReader: reverse eval — normal_var=${varNormal.toFixed(4)} reversed_var=${varReversed.toFixed(4)}`);
-    return varReversed < varNormal;
-  }
-
-  _emitWeight(weight, unit, model) {
-    let finalWeight = weight;
-    if (this._reversed) {
-      const revStr = reverseNumStr(String(weight));
-      finalWeight = parseFloat(revStr) || weight;
-    }
-
-    // Sliding window: re-evaluate reverse liên tục
-    this._recentWeights.push(weight);
-    if (this._recentWeights.length > REVERSE_WINDOW_SIZE) {
-      this._recentWeights.shift();
-    }
-    if (this._recentWeights.length === REVERSE_WINDOW_SIZE) {
-      const shouldReverse = this._evaluateReverse(this._recentWeights);
-      if (shouldReverse !== this._reversed) {
-        log("warn", `ScaleReader: reverse flipped → ${shouldReverse ? "REVERSED" : "NORMAL"}`);
-        this._reversed = shouldReverse;
-        // Recalculate finalWeight với setting mới
-        finalWeight = this._reversed
-          ? (parseFloat(reverseNumStr(String(weight))) || weight)
-          : weight;
-      }
-    }
-
-    // Bỏ qua thay đổi nhỏ hơn ngưỡng (chống nhiễu)
-    if (
-      this._lastWeight !== null &&
-      Math.abs(finalWeight - this._lastWeight) < this._weightDelta
-    ) return;
-    this._lastWeight = finalWeight;
-    this._lastWeightTime = Date.now();
-    log("info", `ScaleReader: ${finalWeight} ${unit} [${model}]${this._reversed ? " (reversed)" : ""}`);
-    this.emit("weight", { weight: finalWeight, unit, model });
   }
 
   _scheduleReconnect(delay = 5000, attempts = 0) {
