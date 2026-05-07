@@ -46,6 +46,10 @@
       <p>The following required environment variables are not set. Create or fix your <code>.env</code> file and restart the app.</p>
       <ul id="list"></ul>
       <p class="hint">Expected file location: <code>.env</code> in the app root directory.</p>
+      <div style="margin-top: 20px; display: flex; gap: 10px;">
+        <button onclick="window.scale.reloadApp()" style="background:#1e1e1e;border:1px solid #333;color:#ccc;padding:6px 16px;cursor:pointer;border-radius:4px;font-family:monospace;font-size:0.78rem;">↺ Tải lại</button>
+        <button onclick="window.scale.checkForUpdates()" style="background:#1e1e1e;border:1px solid #333;color:#ccc;padding:6px 16px;cursor:pointer;border-radius:4px;font-family:monospace;font-size:0.78rem;">Kiểm tra cập nhật</button>
+      </div>
     </div>
     <script>
       const params = new URLSearchParams(location.search);

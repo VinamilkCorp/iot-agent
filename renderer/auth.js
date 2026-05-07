@@ -1,4 +1,7 @@
-// ── Trạng thái token trong bộ nhớ ─────────────────────────────────────────────
+// ── Auth module (IIFE) ────────────────────────────────────────────────────────
+(function () {
+"use strict";
+
 let currentTokens = null;
 let _refreshTimer = null;
 let _refreshPromise = null; // Mutex: tránh gửi nhiều refresh request song song
@@ -67,7 +70,10 @@ async function getAccessToken() {
   return _refreshPromise;
 }
 
-window.auth = { getAccessToken };
+window.auth = {
+  getAccessToken,
+  startLogin: () => { console.warn("[auth] not ready yet — initAuth still running"); },
+};
 
 // Các phần tử DOM của màn hình đăng nhập
 const loginScreen  = document.getElementById("login-screen");
@@ -263,3 +269,5 @@ async function initAuth() {
 }
 
 initAuth();
+
+})();

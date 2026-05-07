@@ -31,8 +31,19 @@ function registerIpcHandlers({
   });
   // Kết nối lại cân
   ipcMain.handle("reload-scale", () => reloadScale());
-  // Tải lại trang renderer
-  ipcMain.handle("reload-app", () => getWin()?.webContents.reload());
+  // Tải lại trang renderer (re-evaluate env để chọn đúng trang)
+  ipcMain.handle("reload-app", () => {
+    const win = getWin();
+    if (!win) return;
+    const missing = AUTH_REQUIRED
+      ? ["LOGIN_URL", "LOGIN_REALM", "LOGIN_CLIENT_ID", "REDIRECT_URI"].filter((k) => !process.env[k])
+      : [];
+    if (missing.length) {
+      win.loadFile("renderer/error.html", { query: { missing: missing.join(",") } });
+    } else {
+      win.loadFile("renderer/index.html");
+    }
+  });
   // Lấy danh sách tất cả cổng serial
   ipcMain.handle("list-ports", () => listPorts());
   // Lấy danh sách cổng có khả năng là cân
