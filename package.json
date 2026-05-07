@@ -5,7 +5,7 @@
   "main": "main.js",
   "author": {
     "name": "Vinamilk",
-    "email": "tavan@vinamilk.com.vn"
+    "email": "hnanh@vinamilk.com.vn"
   },
   "scripts": {
     "start": "electron .",
