@@ -77,10 +77,6 @@
       {
         "from": ".env",
         "to": ".env"
-      },
-      {
-        "from": "drivers/CH341SER",
-        "to": "drivers/CH341SER"
       }
     ]
   },
