@@ -82,6 +82,9 @@ const loginError   = document.getElementById("login-error");
 const loginSpinner = document.getElementById("login-spinner");
 const loginBtn     = document.getElementById("btn-login");
 
+// Disable nút login cho đến khi initAuth hoàn tất
+if (loginBtn) loginBtn.disabled = true;
+
 const log = {
   info: (msg) => console.log(`[auth] ${msg}`),
   warn: (msg) => console.warn(`[auth] ${msg}`),
@@ -221,6 +224,7 @@ async function initAuth() {
   window.auth.startLogin = async () => {
     try { await startLoginFlow(_env); } catch (err) { showError(err); }
   };
+  if (loginBtn) loginBtn.disabled = false;
 
   // Xử lý callback OAuth được lưu trong sessionStorage (sau khi reload)
   const storedCallback = sessionStorage.getItem("kcCallback");
