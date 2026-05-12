@@ -79,8 +79,19 @@ function openWithRetry(path, baudRate, retries = 3, delayMs = 3000) {
 }
 
 // ── Probe & Detect ──────────────────────────────────────────────────────────
-function probePort(path, baudRate, timeout = 3000) {
-  log("info", `probePort: trying ${path} @ ${baudRate}`);
+const PROBE_TIMEOUT = parseInt(process.env.PROBE_TIMEOUT || "10000", 10);
+
+// Các lệnh request phổ biến mà cân có thể cần nhận trước khi gửi data
+const SCALE_REQUEST_CMDS = [
+  "W\r\n",    // Nhiều model Yaohua
+  "P\r\n",    // Print/send command
+  "\r\n",     // Generic wake-up
+  "S\r\n",    // Mettler Toledo MT-SICS: Send stable weight
+  "SI\r\n",   // MT-SICS: Send immediately
+];
+
+function probePort(path, baudRate, timeout = PROBE_TIMEOUT) {
+  log("info", `probePort: trying ${path} @ ${baudRate} (timeout ${timeout}ms)`);
   return new Promise((resolve, reject) => {
     let settled = false;
     let port = null;
@@ -89,6 +100,7 @@ function probePort(path, baudRate, timeout = 3000) {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
+      clearInterval(requestInterval);
       if (port) {
         port.removeAllListeners();
         if (port.isOpen) port.close(() => {});
@@ -100,6 +112,8 @@ function probePort(path, baudRate, timeout = 3000) {
       () => done(new Error(`probePort timeout: ${path} @ ${baudRate}`)),
       timeout,
     );
+
+    let requestInterval = null;
 
     openWithRetry(path, baudRate)
       .then((openedPort) => {
@@ -114,12 +128,26 @@ function probePort(path, baudRate, timeout = 3000) {
           }
         });
         port.on("error", (err) => done(err));
+
+        // Gửi request commands để đánh thức cân (cho loại command mode)
+        let cmdIdx = 0;
+        const sendRequest = () => {
+          if (settled || !port?.isOpen) return;
+          const cmd = SCALE_REQUEST_CMDS[cmdIdx % SCALE_REQUEST_CMDS.length];
+          port.write(cmd, (err) => {
+            if (!err) log("debug", `probePort: sent request "${cmd.trim()}" to ${path}`);
+          });
+          cmdIdx++;
+        };
+        // Gửi ngay lần đầu, sau đó mỗi 2s
+        sendRequest();
+        requestInterval = setInterval(sendRequest, 2000);
       })
       .catch((err) => done(err));
   });
 }
 
-async function detectScale(timeout = 10000) {
+async function detectScale(timeout = PROBE_TIMEOUT) {
   const candidates = await findScalePorts();
   if (!candidates.length) {
     throw Object.assign(
