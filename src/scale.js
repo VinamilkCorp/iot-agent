@@ -26,15 +26,26 @@ function parseRawBytes(data) {
 
 function parseWeight(line) {
   if (typeof line === "string") {
+    log("info", `1`);
     for (const profile of MODEL_PROFILES) {
       const result = profile.parse(line);
-      if (result) return { model: profile.name, ...result };
+      if (result) { 
+         log("info", `2`);
+        return { model: profile.name, ...result };
+      }
     }
     const generic = genericParse(line);
-    if (generic) return { model: "Generic", ...generic };
+    if (generic) { 
+      log("info", `3`); 
+      return { model: "Generic", ...generic }
+    };
     return parseRawBytes(line);
   }
-  if (typeof line === "object") return parseRawBytes(line);
+  if (typeof line === "object") {
+    log("info", `4`); 
+    return parseRawBytes(line)
+  };
+  log("info", `5`); 
   const generic = genericParse(line);
   return generic ? { model: "Generic", ...generic } : null;
 }

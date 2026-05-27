@@ -59,6 +59,15 @@ const MODEL_PROFILES = [
     baudRate: 9600,
     parse: mtSicsParse,
   },
+  {
+    name: "DIN-I",
+    baudRate: 9600,
+    parse: (line) => {
+      //ST,GS     2.4,kg
+      const m = line.match(/(\d+(?:\.\d+)?),([a-zA-Z]+)/);
+      return m ? { weight: parseFloat(m[1]), unit: m[2].toLowerCase() } : null;
+    },
+  },
 ];
 
 // Hàm phân tích chung cho các cân không khớp với profile cụ thể nào
