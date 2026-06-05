@@ -74,7 +74,7 @@ const MODEL_PROFILES = [
     parse: (line) => {
       //ST,GS,+0006.12
       const m = line.match(/[+-]?\d+(\.\d+)?/);
-      return m ? { weight: parseFloat(match[0]), unit: 'kg' } : null;
+      return m ? { weight: parseFloat(m[0]), unit: 'kg' } : null;
     },
   },
 ];
