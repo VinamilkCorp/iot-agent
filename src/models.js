@@ -68,6 +68,15 @@ const MODEL_PROFILES = [
       return m ? { weight: parseFloat(m[1]), unit: m[2].toLowerCase() } : null;
     },
   },
+  {
+    name: "Marcus TD-I2",
+    baudRate: 9600,
+    parse: (line) => {
+      //ST,GS,+0006.12
+      const m = line.match(/[+-]?\d+(\.\d+)?/);
+      return m ? { weight: parseFloat(match[0]), unit: 'kg' } : null;
+    },
+  },
 ];
 
 // Hàm phân tích chung cho các cân không khớp với profile cụ thể nào
